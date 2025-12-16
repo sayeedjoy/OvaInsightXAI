@@ -1,10 +1,5 @@
-# Nixpacks configuration for backend-only build
-# IMPORTANT: In Dokploy dashboard, set Root Directory to "backend"
-# This ensures Nixpacks only builds the Python backend, not the frontend
-
-# Force Python provider (prevents Node.js auto-detection)
-[providers]
-python = "3.10"
+# Nixpacks configuration for backend
+# This file ensures Nixpacks builds only the Python backend
 
 [variables]
 PYTHON_VERSION = "3.10"

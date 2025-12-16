@@ -1,0 +1,5 @@
+# Ignore frontend directory - we only want to build the backend
+frontend/
+frontend/**
+!backend/
+
