@@ -1,0 +1,14 @@
+# Nixpacks configuration for monorepo
+# This tells Nixpacks to only build the backend, not the frontend
+[phases.setup]
+nixPkgs = ["nodejs-20_x", "python310"]
+
+[phases.install]
+cmds = ["cd backend && pip install -r requirements.txt"]
+
+[phases.build]
+cmds = ["echo 'Backend build complete'"]
+
+[start]
+cmd = "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+
