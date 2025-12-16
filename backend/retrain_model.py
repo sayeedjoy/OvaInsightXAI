@@ -17,6 +17,10 @@ import joblib
 from pathlib import Path
 import sklearn
 
+# Model data version - increment this to force retraining
+# v2: Balanced classes with clear separation between positive/negative cases
+MODEL_DATA_VERSION = "v2"
+
 # Feature names (12 biomarkers for ovarian cancer prediction)
 FEATURE_NAMES = [
     "age",
@@ -132,12 +136,13 @@ def train_and_save_model():
     model_with_metadata = {
         "pipeline": pipeline,
         "sklearn_version": sklearn_version,
+        "model_data_version": MODEL_DATA_VERSION,
         "model_type": "LogisticRegression",
         "trained_at": __import__("datetime").datetime.now().isoformat()
     }
     
     print(f"Saving model to {model_path} (absolute: {model_path.resolve()})...")
-    print(f"Model trained with sklearn version: {sklearn_version}")
+    print(f"Model trained with sklearn version: {sklearn_version}, data version: {MODEL_DATA_VERSION}")
     joblib.dump(model_with_metadata, model_path)
     
     # Verify the model file was created

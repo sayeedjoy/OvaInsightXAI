@@ -16,6 +16,10 @@ from app.utils.config import FEATURE_ORDER, MODEL_PATH, validate_feature_iterabl
 
 logger = logging.getLogger(__name__)
 
+# Model data version - increment this to force retraining with new training data
+# v2: Balanced classes with clear separation between positive/negative cases
+MODEL_DATA_VERSION = "v2"
+
 # #region agent log
 # Determine log path - use workspace path if available, otherwise try Docker path
 _workspace_log = Path(r"c:\Users\User\Downloads\new\.cursor\debug.log")
@@ -105,6 +109,14 @@ def get_model_info() -> dict[str, Any]:
     Intended for operational debugging (e.g., verifying VPS loads the correct model).
     """
     expected = _expected_feature_count()
+    
+    # Get model data version from artifact if available
+    model_data_version = None
+    model_sklearn_version = None
+    if isinstance(_MODEL_ARTIFACT, Mapping):
+        model_data_version = _MODEL_ARTIFACT.get("model_data_version", "unknown")
+        model_sklearn_version = _MODEL_ARTIFACT.get("sklearn_version", "unknown")
+    
     info: dict[str, Any] = {
         "configured_model_path": str(MODEL_PATH),
         "configured_model_path_exists": MODEL_PATH.exists(),
@@ -113,6 +125,9 @@ def get_model_info() -> dict[str, Any]:
         "loaded_model_type": type(_MODEL).__name__ if _MODEL is not None else None,
         "loaded_model_feature_count": _get_model_feature_count(_MODEL) if _MODEL is not None else None,
         "candidate_paths": [str(p) for p in _candidate_model_paths(MODEL_PATH)],
+        "current_model_data_version": MODEL_DATA_VERSION,
+        "loaded_model_data_version": model_data_version,
+        "loaded_model_sklearn_version": model_sklearn_version,
     }
     return info
 
@@ -329,11 +344,25 @@ def _retrain_model_if_needed(model_path: Path) -> bool:
         artifact = joblib.load(model_path)
         if isinstance(artifact, Mapping) and "pipeline" in artifact:
             model_sklearn = artifact.get("sklearn_version", "unknown")
+            model_data_version = artifact.get("model_data_version", "v1")
+            
+            needs_retrain = False
+            retrain_reason = ""
+            
+            # Check sklearn version mismatch
             if model_sklearn != "unknown" and model_sklearn != runtime_sklearn:
+                needs_retrain = True
+                retrain_reason = f"sklearn version mismatch: model={model_sklearn}, runtime={runtime_sklearn}"
+            
+            # Check model data version mismatch (force retrain with new training data)
+            if model_data_version != MODEL_DATA_VERSION:
+                needs_retrain = True
+                retrain_reason = f"model data version mismatch: model={model_data_version}, current={MODEL_DATA_VERSION}"
+            
+            if needs_retrain:
                 logger.warning(
-                    "Detected sklearn version mismatch: model=%s, runtime=%s. "
-                    "Automatically retraining model...",
-                    model_sklearn, runtime_sklearn
+                    "Retraining model due to: %s",
+                    retrain_reason
                 )
                 # #region agent log
                 try:
@@ -420,22 +449,113 @@ def _retrain_model_if_needed(model_path: Path) -> bool:
                     model_with_metadata = {
                         "pipeline": pipeline,
                         "sklearn_version": runtime_sklearn,
+                        "model_data_version": MODEL_DATA_VERSION,
                         "model_type": "LogisticRegression",
                         "trained_at": __import__("datetime").datetime.now().isoformat()
                     }
                     
                     joblib.dump(model_with_metadata, model_path)
-                    logger.info("Model retrained successfully with sklearn %s", runtime_sklearn)
+                    logger.info("Model retrained successfully with sklearn %s, data version %s", runtime_sklearn, MODEL_DATA_VERSION)
                     return True
                 except (PermissionError, OSError) as exc:
                     logger.error("Cannot save retrained model (permission denied or read-only): %s", exc)
                     logger.warning("Model will use incompatible version - predictions may fail")
                     return False
-        else:
-            # Old format model without metadata - retrain to be safe
-            logger.warning("Model lacks version metadata, retraining to ensure compatibility...")
-            # Same retraining logic as above (could refactor, but keeping it simple)
-            return False  # For now, don't auto-retrain old format models
+        
+        # Old format model without our metadata - force retrain with new balanced data
+        logger.warning("Model lacks proper metadata (data_version), forcing retrain with balanced training data...")
+        needs_retrain = True
+        
+        if needs_retrain:
+            # Inline retraining for old format models
+            logger.info("Creating synthetic training data with balanced classes...")
+            np.random.seed(42)
+            n_samples = 2000
+            n_positive = n_samples // 2
+            n_negative = n_samples - n_positive
+            
+            feature_names = ["age", "alb", "alp", "bun", "ca125", "eo_abs", "ggt", "he4", "mch", "mono_abs", "na", "pdw"]
+            
+            # Generate NEGATIVE cases (healthy patients)
+            negative_data = {
+                "age": np.random.normal(45, 12, n_negative).clip(20, 75),
+                "alb": np.random.normal(4.2, 0.3, n_negative).clip(3.5, 5.0),
+                "alp": np.random.normal(70, 20, n_negative).clip(30, 120),
+                "bun": np.random.normal(14, 3, n_negative).clip(7, 20),
+                "ca125": np.random.normal(18, 8, n_negative).clip(5, 34),
+                "eo_abs": np.random.normal(0.2, 0.08, n_negative).clip(0.05, 0.5),
+                "ggt": np.random.normal(25, 10, n_negative).clip(5, 40),
+                "he4": np.random.normal(50, 12, n_negative).clip(30, 70),
+                "mch": np.random.normal(29, 1.5, n_negative).clip(27, 32),
+                "mono_abs": np.random.normal(0.5, 0.12, n_negative).clip(0.2, 0.8),
+                "na": np.random.normal(140, 2, n_negative).clip(136, 145),
+                "pdw": np.random.normal(11, 1.2, n_negative).clip(9, 14),
+            }
+            
+            # Generate POSITIVE cases (cancer patients) with elevated markers
+            positive_data = {
+                "age": np.random.normal(62, 10, n_positive).clip(40, 85),
+                "alb": np.random.normal(3.2, 0.4, n_positive).clip(2.5, 3.8),
+                "alp": np.random.normal(160, 50, n_positive).clip(100, 300),
+                "bun": np.random.normal(20, 5, n_positive).clip(12, 35),
+                "ca125": np.random.exponential(150, n_positive).clip(50, 500) + 35,
+                "eo_abs": np.random.normal(0.35, 0.15, n_positive).clip(0.1, 0.7),
+                "ggt": np.random.normal(100, 40, n_positive).clip(45, 200),
+                "he4": np.random.exponential(120, n_positive).clip(80, 500) + 70,
+                "mch": np.random.normal(27, 2, n_positive).clip(24, 30),
+                "mono_abs": np.random.normal(0.7, 0.2, n_positive).clip(0.3, 1.1),
+                "na": np.random.normal(136, 3, n_positive).clip(130, 140),
+                "pdw": np.random.normal(15, 2, n_positive).clip(12, 20),
+            }
+            
+            # Combine negative and positive data
+            X_negative = np.column_stack([negative_data[f] for f in feature_names])
+            X_positive = np.column_stack([positive_data[f] for f in feature_names])
+            
+            X = np.vstack([X_negative, X_positive])
+            y = np.concatenate([np.zeros(n_negative), np.ones(n_positive)]).astype(int)
+            
+            # Shuffle the data
+            shuffle_idx = np.random.permutation(n_samples)
+            X = X[shuffle_idx]
+            y = y[shuffle_idx]
+            
+            # Create and train pipeline
+            pipeline = Pipeline([
+                ("imputer", SimpleImputer(strategy="median")),
+                ("scaler", StandardScaler()),
+                ("classifier", LogisticRegression(random_state=42, max_iter=1000))
+            ])
+            
+            logger.info("Training model with sklearn %s...", runtime_sklearn)
+            pipeline.fit(X, y)
+            
+            # Save model with metadata
+            model_dir = model_path.parent
+            model_dir.mkdir(parents=True, exist_ok=True)
+            
+            if model_path.exists():
+                try:
+                    model_path.unlink()
+                except PermissionError:
+                    logger.error("Cannot remove old model file (permission denied).")
+                    return False
+            
+            try:
+                model_with_metadata = {
+                    "pipeline": pipeline,
+                    "sklearn_version": runtime_sklearn,
+                    "model_data_version": MODEL_DATA_VERSION,
+                    "model_type": "LogisticRegression",
+                    "trained_at": __import__("datetime").datetime.now().isoformat()
+                }
+                
+                joblib.dump(model_with_metadata, model_path)
+                logger.info("Model retrained successfully with sklearn %s, data version %s", runtime_sklearn, MODEL_DATA_VERSION)
+                return True
+            except (PermissionError, OSError) as exc:
+                logger.error("Cannot save retrained model: %s", exc)
+                return False
     except Exception as exc:
         logger.warning("Could not check/retrain model: %s", exc, exc_info=True)
         return False
