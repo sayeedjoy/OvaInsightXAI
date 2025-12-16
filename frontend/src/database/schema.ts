@@ -15,8 +15,7 @@ export const users = pgTable("users", {
         .notNull(),
     updatedAt: timestamp("updated_at")
         .$defaultFn(() => /* @__PURE__ */ new Date())
-        .notNull(),
-    stripeCustomerId: text("stripe_customer_id")
+        .notNull()
 });
 
 
@@ -65,17 +64,3 @@ export const verifications = pgTable("verifications", {
     )
 })
 
-export const subscriptions = pgTable("subscriptions", {
-	id: text('id').primaryKey(),
-	plan: text('plan').notNull(),
-	referenceId: text('reference_id').notNull(),
-	stripeCustomerId: text('stripe_customer_id'),
-	stripeSubscriptionId: text('stripe_subscription_id'),
-	status: text('status').default("incomplete"),
-	periodStart: timestamp('period_start'),
-    periodEnd: timestamp("period_end"),
-    cancelAtPeriodEnd: boolean("cancel_at_period_end"),
-    seats: integer("seats"),
-    trialStart: timestamp('trial_start'),
-    trialEnd: timestamp('trial_end')
-});

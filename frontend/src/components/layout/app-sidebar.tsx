@@ -12,7 +12,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import type * as React from "react"
-import { NavUser } from "@/components/layout/nav-user"
 import {
     Sidebar,
     SidebarContent,
@@ -117,9 +116,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroup>
                 ))}
             </SidebarContent>
-            <SidebarFooter>
-                <NavUser />
-            </SidebarFooter>
         </Sidebar>
     )
 }
