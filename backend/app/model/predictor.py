@@ -31,10 +31,32 @@ def _load_model(path: Path):
         import joblib  # type: ignore
     except ImportError:  # pragma: no cover - joblib optional
         joblib = None
+    
+    try:
+        import sklearn  # type: ignore
+        sklearn_version = sklearn.__version__
+    except ImportError:
+        sklearn_version = "unknown"
+
+    logger.info("Loading model with scikit-learn version: %s", sklearn_version)
 
     if joblib:
         logger.info("Loading model via joblib from %s", path)
-        return joblib.load(path)
+        try:
+            return joblib.load(path)
+        except (AttributeError, TypeError) as exc:
+            if "_fill_dtype" in str(exc) or "has no attribute" in str(exc):
+                logger.error(
+                    "Model version mismatch detected. The model was trained with a different "
+                    "scikit-learn version. Current version: %s. Error: %s",
+                    sklearn_version,
+                    exc
+                )
+                raise ValueError(
+                    f"Model incompatible with current scikit-learn version ({sklearn_version}). "
+                    "Please retrain the model with the current sklearn version."
+                ) from exc
+            raise
 
     logger.info("Joblib unavailable, falling back to pickle for %s", path)
     with path.open("rb") as handle:
@@ -81,11 +103,18 @@ def ensure_model_loaded() -> None:
     if _MODEL is not None:
         return
 
+    # Log detailed path information for debugging
+    logger.info("Attempting to load model from: %s", MODEL_PATH)
+    logger.info("Model path exists: %s", MODEL_PATH.exists())
+    if MODEL_PATH.exists():
+        logger.info("Model file size: %s bytes", MODEL_PATH.stat().st_size)
+        logger.info("Model file permissions: %s", oct(MODEL_PATH.stat().st_mode))
+    
     _MODEL_ARTIFACT = _load_model(MODEL_PATH)
     _MODEL = _extract_estimator(_MODEL_ARTIFACT)
     _SUPPORTS_PROBA = hasattr(_MODEL, "predict_proba")
     logger.info(
-        "Model loaded (%s). Supports predict_proba=%s",
+        "Model loaded successfully (%s). Supports predict_proba=%s",
         type(_MODEL).__name__,
         _SUPPORTS_PROBA,
     )
@@ -99,12 +128,32 @@ def predict(features: Sequence[float]) -> PredictionResult:
     vector = validate_feature_iterable(features)
     # Most sklearn-style estimators expect a 2D array: (n_samples, n_features)
     batch = [vector]
-    raw_prediction = _MODEL.predict(batch)[0]
+    
+    try:
+        raw_prediction = _MODEL.predict(batch)[0]
+    except (AttributeError, TypeError) as exc:
+        if "_fill_dtype" in str(exc) or "has no attribute" in str(exc):
+            logger.error("Model prediction failed due to sklearn version mismatch: %s", exc, exc_info=True)
+            try:
+                import sklearn
+                sklearn_version = sklearn.__version__
+            except ImportError:
+                sklearn_version = "unknown"
+            raise ValueError(
+                f"Model prediction failed due to sklearn version incompatibility (version: {sklearn_version}). "
+                "The model may need to be retrained with the current sklearn version."
+            ) from exc
+        raise
+    
     confidence = None
 
     if _SUPPORTS_PROBA:
-        proba = _MODEL.predict_proba(batch)[0]
-        confidence = float(max(proba))
+        try:
+            proba = _MODEL.predict_proba(batch)[0]
+            confidence = float(max(proba))
+        except (AttributeError, TypeError) as exc:
+            logger.warning("predict_proba failed, continuing without confidence: %s", exc)
+            # Continue without confidence if predict_proba fails
 
     # Cast numpy scalars to native Python types for JSON serialization.
     prediction_value: Union[int, float] = (

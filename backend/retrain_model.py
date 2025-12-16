@@ -15,6 +15,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import joblib
 from pathlib import Path
+import sklearn
 
 # Feature names (12 biomarkers for ovarian cancer prediction)
 FEATURE_NAMES = [
@@ -87,12 +88,24 @@ def train_and_save_model():
     pipeline.fit(X, y)
     
     # Determine model path - use absolute path for Docker compatibility
-    model_path = Path(__file__).parent / "app" / "model" / "model.pkl"
+    # In Docker, __file__ will be /app/retrain_model.py, so parent is /app
+    # Model should be at /app/app/model/model.pkl
+    base_path = Path(__file__).parent.resolve()
+    model_path = base_path / "app" / "model" / "model.pkl"
+    model_path = model_path.resolve()  # Ensure absolute path
     model_dir = model_path.parent
     
     # Ensure model directory exists
     print(f"Ensuring model directory exists: {model_dir}")
     model_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Remove any existing old model to ensure we use the new one
+    if model_path.exists():
+        print(f"Removing old model file at {model_path}...")
+        model_path.unlink()
+    
+    # Log sklearn version for debugging
+    print(f"scikit-learn version: {sklearn.__version__}")
     
     # Save the model
     print(f"Saving model to {model_path} (absolute: {model_path.resolve()})...")
@@ -103,7 +116,12 @@ def train_and_save_model():
         raise FileNotFoundError(f"Model file was not created at {model_path}")
     
     file_size = model_path.stat().st_size
+    if file_size == 0:
+        raise ValueError(f"Model file was created but is empty (0 bytes) at {model_path}")
+    
     print(f"Model file created successfully (size: {file_size} bytes)")
+    print(f"Model file absolute path: {model_path.resolve()}")
+    print(f"Model file is readable: {model_path.is_file()}")
     
     # Verify the model works by loading and testing it
     print("Verifying model...")
