@@ -1,6 +1,13 @@
+import { Inter } from "next/font/google"
 import { Providers } from "./providers"
 import type { ReactNode } from "react"
 import "@/styles/globals.css"
+
+const inter = Inter({
+    subsets: ["latin"],
+    variable: "--font-inter",
+    display: "swap"
+})
 
 export default function RootLayout({
     children
@@ -8,7 +15,7 @@ export default function RootLayout({
     children: ReactNode
 }>) {
     return (
-        <html lang="en" suppressHydrationWarning>
+        <html lang="en" suppressHydrationWarning className={inter.variable}>
             <head>
                 <script
                     async
