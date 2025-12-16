@@ -14,6 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 
+# Copy and run model retraining script to ensure model compatibility with installed sklearn version
+COPY retrain_model.py .
+RUN python retrain_model.py && rm retrain_model.py
+
 # Create model directory if MODEL_PATH points to a different location
 # This allows the model to be mounted or placed in /opt/models
 RUN mkdir -p /opt/models
