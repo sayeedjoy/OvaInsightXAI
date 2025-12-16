@@ -1,73 +1,211 @@
 # ======================
-# OS / Editor
+# Operating System Files
 # ======================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-.vscode/
-.idea/
-.cursor/
+desktop.ini
 
 # ======================
-# Environment files
+# Editor / IDE Files
+# ======================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+*.sublime-project
+*.sublime-workspace
+
+# ======================
+# Environment Variables
 # ======================
 .env
 .env.local
 .env.development
 .env.production
+.env.test
 .env.*.local
+.envrc
 
 # ======================
 # Logs
 # ======================
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 bun-debug.log*
+lerna-debug.log*
 
 # ======================
-# Node / Frontend
+# Frontend / Next.js
 # ======================
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Next.js
 .next/
 out/
 dist/
 build/
-.turbo/
 .vercel/
+.vercelignore
 
-# Package managers
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-bun.lockb
+# Turbo
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing
+coverage/
+.nyc_output/
+.jest/
 
 # ======================
 # Backend / Python
 # ======================
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
+*.so
 .Python
+
+# Virtual Environments
 venv/
-.env/
+env/
+ENV/
 .venv/
+.env/
+virtualenv/
+
+# Distribution / Packaging
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+wheels/
+*.whl
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
 
 # ======================
-# Database / ORM
+# Machine Learning Models
+# ======================
+# Uncomment if model files are too large for Git
+# *.pkl
+# *.h5
+# *.hdf5
+# *.joblib
+# *.model
+# models/
+# weights/
+
+# ======================
+# Database Files
 # ======================
 *.sqlite
+*.sqlite3
 *.db
+*.db-shm
+*.db-wal
 
 # ======================
-# Testing / Coverage
+# Package Manager Lock Files
 # ======================
-coverage/
-.nyc_output/
+# Keep pnpm-lock.yaml (project uses pnpm)
+# Ignore other lock files
+package-lock.json
+yarn.lock
+bun.lockb
 
 # ======================
-# Misc
+# Uploads / User Content
 # ======================
-*.log
-/frontend/node_modules
+uploads/
+temp/
+tmp/
+*.tmp
+
+# ======================
+# Cache Directories
+# ======================
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# ======================
+# Miscellaneous
+# ======================
+*.pid
+*.seed
+*.pid.lock
+.npm
+
+# Optional: Keep sensitive config files out
+# config/secrets.json
+# config/production.json
