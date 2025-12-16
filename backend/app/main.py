@@ -40,3 +40,17 @@ app.add_middleware(
 app.include_router(predict.router)
 
 
+@app.get("/")
+async def root():
+    """Root endpoint for health checks and API information."""
+    return {
+        "status": "ok",
+        "message": "ML Prediction API is running",
+        "version": "0.1.0",
+        "endpoints": {
+            "health": "/health",
+            "predict": "/predict",
+            "docs": "/docs"
+        }
+    }
+

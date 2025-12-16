@@ -13,14 +13,31 @@ from app.schemas.input_schema import HealthResponse, PredictionRequest, Predicti
 from app.services.preprocessing import request_to_features
 from app.utils.config import FeatureOrderError
 
+logger = logging.getLogger(__name__)
+
 # Add backend root to path to import test_case_generator
 backend_root = Path(__file__).resolve().parent.parent.parent
 if str(backend_root) not in sys.path:
     sys.path.insert(0, str(backend_root))
 
-from test_case_generator import generate_negative_cases, generate_positive_cases
-
-logger = logging.getLogger(__name__)
+# Try to import test_case_generator, but make it optional
+try:
+    from test_case_generator import generate_negative_cases, generate_positive_cases
+    TEST_CASE_GENERATOR_AVAILABLE = True
+except ImportError:
+    logger.warning("test_case_generator not found. Test case endpoints will be disabled.")
+    TEST_CASE_GENERATOR_AVAILABLE = False
+    # Create dummy functions to avoid errors
+    def generate_negative_cases(*args, **kwargs):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Test case generator not available"
+        )
+    def generate_positive_cases(*args, **kwargs):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Test case generator not available"
+        )
 
 router = APIRouter(tags=["prediction"])
 
