@@ -10,6 +10,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, NamedTuple, Sequence, Union
 
+import numpy as np
+
 from app.utils.config import FEATURE_ORDER, MODEL_PATH, validate_feature_iterable
 
 logger = logging.getLogger(__name__)
@@ -499,8 +501,19 @@ def predict(features: Sequence[float]) -> PredictionResult:
         raise RuntimeError("Model has not been loaded yet. Call ensure_model_loaded().")
 
     vector = validate_feature_iterable(features)
+    
+    # Log input features for debugging
+    logger.debug("Input features: %s", vector)
+    logger.debug("Feature count: %d (expected: %d)", len(vector), _expected_feature_count())
+    
+    # Convert to numpy array with proper shape: (n_samples, n_features)
     # Most sklearn-style estimators expect a 2D array: (n_samples, n_features)
-    batch = [vector]
+    try:
+        batch = np.array(vector).reshape(1, -1)
+        logger.debug("Batch shape: %s, dtype: %s", batch.shape, batch.dtype)
+    except Exception as exc:
+        logger.error("Failed to create numpy array from features: %s", exc, exc_info=True)
+        raise ValueError(f"Failed to prepare feature array: {str(exc)}") from exc
     
     # #region agent log
     try:
@@ -510,12 +523,15 @@ def predict(features: Sequence[float]) -> PredictionResult:
         runtime_sklearn = "unknown"
     try:
         with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:before_predict", "message": "Before prediction", "data": {"model_type": str(type(_MODEL)), "runtime_sklearn": runtime_sklearn, "batch_shape": [len(batch), len(batch[0])]}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:before_predict", "message": "Before prediction", "data": {"model_type": str(type(_MODEL)), "runtime_sklearn": runtime_sklearn, "batch_shape": list(batch.shape), "supports_proba": _SUPPORTS_PROBA}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
     except: pass
     # #endregion
     
+    # Run prediction with comprehensive error handling
     try:
+        logger.debug("Calling model.predict() with batch shape: %s", batch.shape)
         raw_prediction = _MODEL.predict(batch)[0]
+        logger.debug("Raw prediction result: %s (type: %s)", raw_prediction, type(raw_prediction))
     except (AttributeError, TypeError) as exc:
         # #region agent log
         try:
@@ -534,22 +550,34 @@ def predict(features: Sequence[float]) -> PredictionResult:
                 f"Model prediction failed due to sklearn version incompatibility (version: {sklearn_version}). "
                 "The model may need to be retrained with the current sklearn version."
             ) from exc
+        logger.error("Model prediction failed with AttributeError/TypeError: %s", exc, exc_info=True)
         raise
+    except Exception as exc:
+        logger.error("Unexpected error during model prediction: %s", exc, exc_info=True)
+        logger.error("Model type: %s, Batch shape: %s, Batch dtype: %s", type(_MODEL).__name__, batch.shape, batch.dtype)
+        raise ValueError(f"Model prediction failed: {str(exc)}") from exc
     
     confidence = None
 
     if _SUPPORTS_PROBA:
         try:
+            logger.debug("Calling model.predict_proba() with batch shape: %s", batch.shape)
             proba = _MODEL.predict_proba(batch)[0]
             confidence = float(max(proba))
+            logger.debug("Prediction probabilities: %s, confidence: %s", proba, confidence)
         except (AttributeError, TypeError) as exc:
             logger.warning("predict_proba failed, continuing without confidence: %s", exc)
+            # Continue without confidence if predict_proba fails
+        except Exception as exc:
+            logger.warning("Unexpected error during predict_proba: %s", exc, exc_info=True)
             # Continue without confidence if predict_proba fails
 
     # Cast numpy scalars to native Python types for JSON serialization.
     prediction_value: Union[int, float] = (
         raw_prediction.item() if hasattr(raw_prediction, "item") else raw_prediction
     )
+    
+    logger.info("Prediction completed: prediction=%s, confidence=%s", prediction_value, confidence)
 
     return PredictionResult(prediction=prediction_value, confidence=confidence)
 
