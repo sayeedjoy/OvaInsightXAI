@@ -152,7 +152,6 @@ dmypy.json
 # Machine Learning Models
 # ======================
 # Model files are too large for Git
-*.pkl
 *.h5
 *.hdf5
 *.joblib
@@ -209,4 +208,3 @@ tmp/
 # Optional: Keep sensitive config files out
 # config/secrets.json
 # config/production.json
-/backend/app/model/model.pkl
