@@ -434,6 +434,215 @@ docker run -p 8000:8000 ovarian-cancer-api
 
 ---
 
+## Model File Deployment
+
+Since `model.pkl` (130+ MB) exceeds GitHub's 100 MB file limit, it's excluded from the repository via `.gitignore`. You need to deploy the model file separately. Here are several approaches:
+
+### Option 1: Manual Upload via Platform File System (Recommended for Most Platforms)
+
+#### Railway
+1. After initial deployment, use Railway's **Volume** feature:
+   - Go to your service → **Settings** → **Volumes**
+   - Create a volume and mount it to `/app/app/model`
+   - Upload `model.pkl` to the volume via Railway CLI or dashboard
+
+2. **Or** use Railway's file upload:
+   ```bash
+   railway run bash
+   # Then upload model.pkl to backend/app/model/
+   ```
+
+#### Render
+1. After deployment, SSH into your service:
+   ```bash
+   # Render provides SSH access in dashboard
+   ```
+2. Upload model file via SCP or use Render's file browser:
+   ```bash
+   scp backend/app/model/model.pkl user@your-service.onrender.com:/opt/render/project/src/app/model/
+   ```
+
+#### Fly.io
+1. Use Fly's volumes or upload during deployment:
+   ```bash
+   fly volumes create model_data --size 1
+   ```
+2. Mount in `fly.toml`:
+   ```toml
+   [[mounts]]
+     source = "model_data"
+     destination = "/app/app/model"
+   ```
+3. Upload model file:
+   ```bash
+   fly ssh console
+   # Then copy model.pkl to /app/app/model/
+   ```
+
+### Option 2: Download from Cloud Storage During Build
+
+Store your model in cloud storage (AWS S3, Google Cloud Storage, etc.) and download during deployment.
+
+#### Step 1: Upload Model to Cloud Storage
+
+**AWS S3 Example:**
+```bash
+aws s3 cp backend/app/model/model.pkl s3://your-bucket/models/model.pkl
+```
+
+**Google Cloud Storage Example:**
+```bash
+gsutil cp backend/app/model/model.pkl gs://your-bucket/models/model.pkl
+```
+
+#### Step 2: Create Download Script
+
+Create `backend/scripts/download_model.sh`:
+```bash
+#!/bin/bash
+set -e
+
+MODEL_DIR="app/model"
+MODEL_URL="${MODEL_URL:-https://your-storage-url.com/models/model.pkl}"
+
+mkdir -p "$MODEL_DIR"
+curl -L "$MODEL_URL" -o "$MODEL_DIR/model.pkl"
+
+echo "Model downloaded successfully"
+```
+
+#### Step 3: Update Build Process
+
+**For Railway/Render:**
+- Add to **Build Command**:
+  ```bash
+  chmod +x scripts/download_model.sh && scripts/download_model.sh && pip install -r requirements.txt
+  ```
+
+**For Docker:**
+Update `backend/Dockerfile`:
+```dockerfile
+# Add before CMD
+RUN chmod +x scripts/download_model.sh
+RUN scripts/download_model.sh
+```
+
+#### Step 4: Set Environment Variable
+
+Add to your platform's environment variables:
+```env
+MODEL_URL=https://your-storage-url.com/models/model.pkl
+```
+
+### Option 3: Git LFS (Git Large File Storage)
+
+If you want to keep the model in Git:
+
+#### Step 1: Install Git LFS
+```bash
+# Windows (via Chocolatey)
+choco install git-lfs
+
+# Or download from https://git-lfs.github.com/
+```
+
+#### Step 2: Initialize Git LFS
+```bash
+cd backend
+git lfs install
+git lfs track "app/model/*.pkl"
+git add .gitattributes
+git commit -m "Track model files with Git LFS"
+```
+
+#### Step 3: Add Model File
+```bash
+git add app/model/model.pkl
+git commit -m "Add model file via Git LFS"
+git push
+```
+
+**Note**: Git LFS has storage quotas on free GitHub accounts (1 GB storage, 1 GB bandwidth/month).
+
+### Option 4: CI/CD Script Download
+
+Create a deployment script that downloads the model as part of CI/CD:
+
+Create `backend/.github/workflows/deploy.yml` (if using GitHub Actions):
+```yaml
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download model file
+        run: |
+          mkdir -p backend/app/model
+          curl -L "${{ secrets.MODEL_URL }}" -o backend/app/model/model.pkl
+      
+      - name: Deploy to platform
+        # Add your platform-specific deployment steps
+```
+
+### Option 5: Platform-Specific File Upload
+
+Some platforms allow direct file uploads:
+
+#### Dokploy
+- Use Dokploy's file manager to upload `model.pkl` to `backend/app/model/` after deployment
+
+#### DigitalOcean App Platform
+- Use **Settings** → **App-Level Settings** → **File Uploads** to upload the model file
+
+### Recommended Approach
+
+**For Production:**
+- **Option 2 (Cloud Storage)** - Most reliable and scalable
+- Store model in S3/GCS with public or signed URL
+- Download during build process
+- No Git repository bloat
+
+**For Quick Deployment:**
+- **Option 1 (Manual Upload)** - Fastest for initial setup
+- Deploy without model first
+- Upload model file via platform's file system access
+- Works well for Railway, Render, Fly.io
+
+**For Development/Testing:**
+- **Option 3 (Git LFS)** - If you need version control for model files
+- Good for small teams
+- Watch storage quotas
+
+### Verification
+
+After deployment, verify the model loads correctly:
+
+```bash
+# Check health endpoint
+curl https://your-api-url.com/health
+
+# Test prediction endpoint
+curl -X POST https://your-api-url.com/predict \
+  -H "Content-Type: application/json" \
+  -d '{"age": 45, "alb": 4.2, "alp": 85, "bun": 15, "ca125": 35, "eo_abs": 0.2, "ggt": 25, "he4": 50, "mch": 28, "mono_abs": 0.5, "na": 140, "pdw": 12}'
+```
+
+If the model file is missing, you'll see:
+```json
+{
+  "detail": "Model file not found at /app/app/model/model.pkl"
+}
+```
+
+---
+
 ## Environment Variables
 
 ### Frontend Environment Variables
@@ -557,9 +766,12 @@ ALLOWED_ORIGINS = [
 
 - **Issue**: `FileNotFoundError: model.pkl`
 - **Solution**:
-  - Ensure `model.pkl` is committed to repository
-  - Verify path in `backend/app/utils/config.py`
-  - Check file exists in `backend/app/model/` directory
+  - **Model file is NOT in Git repository** (exceeds 100 MB limit)
+  - You must deploy the model file separately (see [Model File Deployment](#model-file-deployment) section)
+  - Verify path in `backend/app/utils/config.py` (should be `app/model/model.pkl`)
+  - Check file exists in `backend/app/model/` directory on deployed server
+  - For cloud storage approach: Verify `MODEL_URL` environment variable is set correctly
+  - For manual upload: Ensure file was uploaded to correct path on server
 
 #### Port Already in Use
 
