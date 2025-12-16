@@ -36,6 +36,7 @@ interface PredictionFormProps {
     onInputChange: (key: FeatureKey, value: string) => void
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
     onReset: () => void
+    onFillTestCase?: (type: "negative" | "positive") => void
 }
 
 export function PredictionForm({
@@ -43,7 +44,8 @@ export function PredictionForm({
     isSubmitting,
     onInputChange,
     onSubmit,
-    onReset
+    onReset,
+    onFillTestCase
 }: PredictionFormProps) {
     return (
         <Card>
@@ -82,23 +84,47 @@ export function PredictionForm({
                             />
                         </div>
                     ))}
-                    <div className="flex flex-col gap-3 pt-2 sm:col-span-2 lg:col-span-3 sm:flex-row">
-                        <Button 
-                            type="submit" 
-                            disabled={isSubmitting}
-                            className="w-full sm:w-auto sm:flex-1 lg:text-base lg:h-11"
-                        >
-                            {isSubmitting ? "Predicting..." : "Run Prediction"}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onReset}
-                            disabled={isSubmitting}
-                            className="w-full sm:w-auto lg:text-base lg:h-11"
-                        >
-                            Reset
-                        </Button>
+                    <div className="flex flex-col gap-3 pt-2 sm:col-span-2 lg:col-span-3">
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                            <Button 
+                                type="submit" 
+                                disabled={isSubmitting}
+                                className="w-full sm:w-auto sm:flex-1 lg:text-base lg:h-11"
+                            >
+                                {isSubmitting ? "Predicting..." : "Run Prediction"}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onReset}
+                                disabled={isSubmitting}
+                                className="w-full sm:w-auto lg:text-base lg:h-11"
+                            >
+                                Reset
+                            </Button>
+                        </div>
+                        {onFillTestCase && (
+                            <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => onFillTestCase("negative")}
+                                    disabled={isSubmitting}
+                                    className="w-full sm:w-auto sm:flex-1 lg:text-base lg:h-11"
+                                >
+                                    Fill Negative Case
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => onFillTestCase("positive")}
+                                    disabled={isSubmitting}
+                                    className="w-full sm:w-auto sm:flex-1 lg:text-base lg:h-11"
+                                >
+                                    Fill Positive Case
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </form>
             </CardContent>

@@ -10,3 +10,5 @@ export {
     type PredictionResult
 } from "./prediction-result"
 
+export { PredictionLoading } from "./prediction-loading"
+
