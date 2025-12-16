@@ -41,7 +41,6 @@ tests/
 
 # Scripts (not needed in container)
 scripts/
-retrain_model.py
 
 # Distribution / packaging
 *.egg
