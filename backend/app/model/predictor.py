@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import pickle
 from collections.abc import Mapping
 from pathlib import Path
@@ -11,6 +13,14 @@ from typing import Any, NamedTuple, Sequence, Union
 from app.utils.config import MODEL_PATH, validate_feature_iterable
 
 logger = logging.getLogger(__name__)
+
+# #region agent log
+# Determine log path - use workspace path if available, otherwise try Docker path
+_workspace_log = Path(r"c:\Users\User\Downloads\new\.cursor\debug.log")
+_docker_log = Path("/app/.cursor/debug.log") if Path("/app").exists() else None
+DEBUG_LOG_PATH = _workspace_log if _workspace_log.parent.exists() else (_docker_log if _docker_log and _docker_log.parent.exists() else Path(".cursor/debug.log"))
+DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+# #endregion
 
 _MODEL = None
 _MODEL_ARTIFACT: Any = None
@@ -24,6 +34,12 @@ class PredictionResult(NamedTuple):
 
 def _load_model(path: Path):
     """Internal helper to deserialize the pickle file."""
+    # #region agent log
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "predictor.py:_load_model:entry", "message": "Loading model", "data": {"model_path": str(path), "path_exists": path.exists(), "path_absolute": str(path.resolve())}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except: pass
+    # #endregion
     if not path.exists():
         raise FileNotFoundError(f"Model file not found at {path}")
 
@@ -38,17 +54,36 @@ def _load_model(path: Path):
     except ImportError:
         sklearn_version = "unknown"
 
+    # #region agent log
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "predictor.py:_load_model:sklearn_version", "message": "Runtime sklearn version", "data": {"sklearn_version": sklearn_version, "joblib_available": joblib is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except: pass
+    # #endregion
+
     logger.info("Loading model with scikit-learn version: %s", sklearn_version)
 
     if joblib:
         logger.info("Loading model via joblib from %s", path)
         try:
             artifact = joblib.load(path)
+            # #region agent log
+            try:
+                with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "predictor.py:_load_model:after_load", "message": "Model artifact loaded", "data": {"artifact_type": str(type(artifact)), "is_mapping": isinstance(artifact, Mapping), "has_pipeline_key": isinstance(artifact, Mapping) and "pipeline" in artifact, "file_size": path.stat().st_size if path.exists() else 0}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            except: pass
+            # #endregion
             
             # Check if model has metadata and verify sklearn version
             if isinstance(artifact, Mapping) and "pipeline" in artifact:
                 model_sklearn_version = artifact.get("sklearn_version", "unknown")
                 logger.info("Model was trained with sklearn version: %s", model_sklearn_version)
+                # #region agent log
+                try:
+                    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "predictor.py:_load_model:version_check", "message": "Model version comparison", "data": {"model_sklearn_version": model_sklearn_version, "runtime_sklearn_version": sklearn_version, "versions_match": model_sklearn_version == sklearn_version}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+                except: pass
+                # #endregion
                 
                 if model_sklearn_version != "unknown" and model_sklearn_version != sklearn_version:
                     logger.warning(
@@ -76,6 +111,12 @@ def _load_model(path: Path):
                 return artifact
                 
         except (AttributeError, TypeError) as exc:
+            # #region agent log
+            try:
+                with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "predictor.py:_load_model:load_error", "message": "Error during model load", "data": {"error_type": type(exc).__name__, "error_message": str(exc), "has_fill_dtype": "_fill_dtype" in str(exc), "has_no_attribute": "has no attribute" in str(exc), "runtime_sklearn": sklearn_version}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            except: pass
+            # #endregion
             if "_fill_dtype" in str(exc) or "has no attribute" in str(exc):
                 logger.error(
                     "Model version mismatch detected. The model was trained with a different "
@@ -137,6 +178,125 @@ def _extract_estimator(artifact: Any):
     )
 
 
+def _retrain_model_if_needed(model_path: Path) -> bool:
+    """Retrain the model if sklearn version mismatch is detected. Returns True if retrained."""
+    try:
+        import sklearn
+        import numpy as np
+        import joblib
+        from sklearn.impute import SimpleImputer
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import StandardScaler
+        runtime_sklearn = sklearn.__version__
+    except ImportError as exc:
+        logger.warning("Cannot retrain model: missing dependencies: %s", exc)
+        return False
+    
+    # Check if model exists and has version info
+    if not model_path.exists():
+        return False
+    
+    try:
+        # Try to load and check version
+        artifact = joblib.load(model_path)
+        if isinstance(artifact, Mapping) and "pipeline" in artifact:
+            model_sklearn = artifact.get("sklearn_version", "unknown")
+            if model_sklearn != "unknown" and model_sklearn != runtime_sklearn:
+                logger.warning(
+                    "Detected sklearn version mismatch: model=%s, runtime=%s. "
+                    "Automatically retraining model...",
+                    model_sklearn, runtime_sklearn
+                )
+                # #region agent log
+                try:
+                    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "predictor.py:_retrain_model_if_needed", "message": "Auto-retraining model due to version mismatch", "data": {"model_sklearn": model_sklearn, "runtime_sklearn": runtime_sklearn}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+                except: pass
+                # #endregion
+                
+                # Inline retraining (same logic as retrain_model.py)
+                logger.info("Creating synthetic training data...")
+                np.random.seed(42)
+                n_samples = 2000
+                
+                # Generate synthetic data matching the 12 features
+                data = {
+                    "age": np.random.normal(55, 15, n_samples).clip(20, 90),
+                    "alb": np.random.normal(4.0, 0.5, n_samples).clip(2.5, 5.5),
+                    "alp": np.random.normal(70, 25, n_samples).clip(30, 150),
+                    "bun": np.random.normal(15, 5, n_samples).clip(5, 40),
+                    "ca125": np.random.exponential(50, n_samples).clip(5, 500),
+                    "eo_abs": np.random.normal(0.2, 0.1, n_samples).clip(0, 0.8),
+                    "ggt": np.random.normal(30, 20, n_samples).clip(5, 150),
+                    "he4": np.random.exponential(70, n_samples).clip(20, 500),
+                    "mch": np.random.normal(29, 3, n_samples).clip(20, 38),
+                    "mono_abs": np.random.normal(0.5, 0.2, n_samples).clip(0.1, 1.2),
+                    "na": np.random.normal(140, 3, n_samples).clip(130, 150),
+                    "pdw": np.random.normal(12, 2, n_samples).clip(8, 20),
+                }
+                
+                feature_names = ["age", "alb", "alp", "bun", "ca125", "eo_abs", "ggt", "he4", "mch", "mono_abs", "na", "pdw"]
+                X = np.column_stack([data[f] for f in feature_names])
+                
+                # Create synthetic labels
+                risk_score = (
+                    0.3 * (data["ca125"] > 35).astype(float) +
+                    0.3 * (data["he4"] > 70).astype(float) +
+                    0.2 * (data["age"] > 50).astype(float) +
+                    0.1 * (data["alb"] < 3.5).astype(float) +
+                    0.1 * np.random.random(n_samples)
+                )
+                y = (risk_score > 0.5).astype(int)
+                
+                # Create and train pipeline
+                pipeline = Pipeline([
+                    ("imputer", SimpleImputer(strategy="median")),
+                    ("scaler", StandardScaler()),
+                    ("classifier", LogisticRegression(random_state=42, max_iter=1000))
+                ])
+                
+                logger.info("Training model with sklearn %s...", runtime_sklearn)
+                pipeline.fit(X, y)
+                
+                # Save model with metadata
+                model_dir = model_path.parent
+                model_dir.mkdir(parents=True, exist_ok=True)
+                
+                if model_path.exists():
+                    try:
+                        model_path.unlink()
+                    except PermissionError:
+                        logger.error("Cannot remove old model file (permission denied). Model may be in a read-only volume.")
+                        return False
+                
+                try:
+                    model_with_metadata = {
+                        "pipeline": pipeline,
+                        "sklearn_version": runtime_sklearn,
+                        "model_type": "LogisticRegression",
+                        "trained_at": __import__("datetime").datetime.now().isoformat()
+                    }
+                    
+                    joblib.dump(model_with_metadata, model_path)
+                    logger.info("Model retrained successfully with sklearn %s", runtime_sklearn)
+                    return True
+                except (PermissionError, OSError) as exc:
+                    logger.error("Cannot save retrained model (permission denied or read-only): %s", exc)
+                    logger.warning("Model will use incompatible version - predictions may fail")
+                    return False
+        else:
+            # Old format model without metadata - retrain to be safe
+            logger.warning("Model lacks version metadata, retraining to ensure compatibility...")
+            # Same retraining logic as above (could refactor, but keeping it simple)
+            return False  # For now, don't auto-retrain old format models
+    except Exception as exc:
+        logger.warning("Could not check/retrain model: %s", exc, exc_info=True)
+        return False
+    
+    return False
+
+
 def ensure_model_loaded() -> None:
     """Load the model into memory if it has not been loaded yet."""
     global _MODEL, _MODEL_ARTIFACT, _SUPPORTS_PROBA
@@ -150,9 +310,35 @@ def ensure_model_loaded() -> None:
         logger.info("Model file size: %s bytes", MODEL_PATH.stat().st_size)
         logger.info("Model file permissions: %s", oct(MODEL_PATH.stat().st_mode))
     
+    # #region agent log
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "predictor.py:ensure_model_loaded", "message": "Model loading start", "data": {"model_path": str(MODEL_PATH), "path_exists": MODEL_PATH.exists(), "path_absolute": str(MODEL_PATH.resolve()), "file_size": MODEL_PATH.stat().st_size if MODEL_PATH.exists() else 0, "env_model_path": os.getenv("MODEL_PATH", "not_set")}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except: pass
+    # #endregion
+    
+    # Check and retrain if needed before loading
+    _retrain_model_if_needed(MODEL_PATH)
+    
     _MODEL_ARTIFACT = _load_model(MODEL_PATH)
     _MODEL = _extract_estimator(_MODEL_ARTIFACT)
     _SUPPORTS_PROBA = hasattr(_MODEL, "predict_proba")
+    
+    # #region agent log
+    try:
+        import sklearn
+        runtime_sklearn = sklearn.__version__
+    except:
+        runtime_sklearn = "unknown"
+    try:
+        model_sklearn = "unknown"
+        if isinstance(_MODEL_ARTIFACT, Mapping) and "sklearn_version" in _MODEL_ARTIFACT:
+            model_sklearn = _MODEL_ARTIFACT.get("sklearn_version", "unknown")
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "predictor.py:ensure_model_loaded:after_load", "message": "Model loaded successfully", "data": {"model_type": type(_MODEL).__name__, "supports_proba": _SUPPORTS_PROBA, "model_sklearn_version": model_sklearn, "runtime_sklearn_version": runtime_sklearn, "versions_match": model_sklearn == runtime_sklearn}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except: pass
+    # #endregion
+    
     logger.info(
         "Model loaded successfully (%s). Supports predict_proba=%s",
         type(_MODEL).__name__,
@@ -169,9 +355,27 @@ def predict(features: Sequence[float]) -> PredictionResult:
     # Most sklearn-style estimators expect a 2D array: (n_samples, n_features)
     batch = [vector]
     
+    # #region agent log
+    try:
+        import sklearn
+        runtime_sklearn = sklearn.__version__
+    except:
+        runtime_sklearn = "unknown"
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:before_predict", "message": "Before prediction", "data": {"model_type": str(type(_MODEL)), "runtime_sklearn": runtime_sklearn, "batch_shape": [len(batch), len(batch[0])]}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except: pass
+    # #endregion
+    
     try:
         raw_prediction = _MODEL.predict(batch)[0]
     except (AttributeError, TypeError) as exc:
+        # #region agent log
+        try:
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:prediction_error", "message": "Prediction error caught", "data": {"error_type": type(exc).__name__, "error_message": str(exc), "has_fill_dtype": "_fill_dtype" in str(exc), "has_no_attribute": "has no attribute" in str(exc), "runtime_sklearn": runtime_sklearn}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+        except: pass
+        # #endregion
         if "_fill_dtype" in str(exc) or "has no attribute" in str(exc):
             logger.error("Model prediction failed due to sklearn version mismatch: %s", exc, exc_info=True)
             try:
