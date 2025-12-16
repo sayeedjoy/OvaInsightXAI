@@ -86,19 +86,43 @@ def train_and_save_model():
     print("Training model...")
     pipeline.fit(X, y)
     
-    # Save the model
+    # Determine model path - use absolute path for Docker compatibility
     model_path = Path(__file__).parent / "app" / "model" / "model.pkl"
-    print(f"Saving model to {model_path}...")
+    model_dir = model_path.parent
+    
+    # Ensure model directory exists
+    print(f"Ensuring model directory exists: {model_dir}")
+    model_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save the model
+    print(f"Saving model to {model_path} (absolute: {model_path.resolve()})...")
     joblib.dump(pipeline, model_path)
     
-    # Verify the model works
+    # Verify the model file was created
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model file was not created at {model_path}")
+    
+    file_size = model_path.stat().st_size
+    print(f"Model file created successfully (size: {file_size} bytes)")
+    
+    # Verify the model works by loading and testing it
     print("Verifying model...")
     test_sample = X[:1]
     prediction = pipeline.predict(test_sample)
     proba = pipeline.predict_proba(test_sample)
     print(f"Test prediction: {prediction[0]}, confidence: {max(proba[0]):.3f}")
     
-    print("Done! Model saved successfully.")
+    # Verify we can load the saved model
+    print("Verifying saved model can be loaded...")
+    loaded_model = joblib.load(model_path)
+    loaded_prediction = loaded_model.predict(test_sample)
+    loaded_proba = loaded_model.predict_proba(test_sample)
+    print(f"Loaded model test prediction: {loaded_prediction[0]}, confidence: {max(loaded_proba[0]):.3f}")
+    
+    if prediction[0] != loaded_prediction[0]:
+        raise ValueError("Saved model produces different predictions than original model")
+    
+    print("Done! Model saved and verified successfully.")
 
 
 if __name__ == "__main__":
