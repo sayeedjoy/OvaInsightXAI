@@ -116,30 +116,37 @@ export default function PredictPage() {
             : null
 
     return (
-        <div className="container mx-auto max-w-5xl py-10">
-            <div className="mb-8 space-y-2 text-center">
-                <h1 className="text-3xl font-semibold">Prediction Form</h1>
-                <p className="text-muted-foreground">
+        <div className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10 lg:px-10">
+            <div className="mb-6 space-y-2 text-center sm:mb-8">
+                <h1 className="text-2xl font-semibold sm:text-3xl md:text-4xl">
+                    Prediction Form
+                </h1>
+                <p className="text-sm text-muted-foreground sm:text-base">
                     Provide the 12 biomarkers below to run inference against the FastAPI
                     backend.
                 </p>
             </div>
-            <div className="grid gap-8 md:grid-cols-[2fr_1fr]">
+            <div className="grid gap-6 lg:grid-cols-[2fr_1fr] lg:gap-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Patient Metrics</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-lg sm:text-xl">Patient Metrics</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm">
                             All values are required. Use numeric values only.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-4 sm:pt-6">
                         <form
-                            className="grid gap-4 md:grid-cols-2"
+                            className="grid gap-4 sm:grid-cols-2 sm:gap-5"
                             onSubmit={handleSubmit}
                         >
                             {FEATURE_FIELDS.map((field) => (
                                 <div className="flex flex-col space-y-2" key={field.key}>
-                                    <Label htmlFor={field.key}>{field.label}</Label>
+                                    <Label 
+                                        htmlFor={field.key}
+                                        className="text-sm sm:text-base"
+                                    >
+                                        {field.label}
+                                    </Label>
                                     <Input
                                         id={field.key}
                                         type="number"
@@ -154,11 +161,16 @@ export default function PredictPage() {
                                         }
                                         step="any"
                                         required
+                                        className="h-9 sm:h-10 text-sm sm:text-base"
                                     />
                                 </div>
                             ))}
-                            <div className="md:col-span-2 flex gap-3 pt-2">
-                                <Button type="submit" disabled={isSubmitting}>
+                            <div className="flex flex-col gap-3 pt-2 sm:col-span-2 sm:flex-row">
+                                <Button 
+                                    type="submit" 
+                                    disabled={isSubmitting}
+                                    className="w-full sm:w-auto sm:flex-1"
+                                >
                                     {isSubmitting ? "Predicting..." : "Run Prediction"}
                                 </Button>
                                 <Button
@@ -166,6 +178,7 @@ export default function PredictPage() {
                                     variant="outline"
                                     onClick={resetForm}
                                     disabled={isSubmitting}
+                                    className="w-full sm:w-auto"
                                 >
                                     Reset
                                 </Button>
@@ -174,36 +187,40 @@ export default function PredictPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit">
+                <Card className="h-fit lg:sticky lg:top-6">
                     <CardHeader>
-                        <CardTitle>Result</CardTitle>
-                        <CardDescription>
-                            {"Shows the latest prediction and confidence score."}
+                        <CardTitle className="text-lg sm:text-xl">Result</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm">
+                            Shows the latest prediction and confidence score.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 pt-4 sm:pt-6">
                         {error && (
-                            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive sm:text-sm">
                                 {error}
                             </p>
                         )}
                         {result ? (
                             <div className="space-y-2">
-                                <p className="text-sm text-muted-foreground">Prediction</p>
-                                <p className="text-3xl font-semibold">{result.prediction}</p>
+                                <p className="text-xs text-muted-foreground sm:text-sm">
+                                    Prediction
+                                </p>
+                                <p className="text-2xl font-semibold sm:text-3xl md:text-4xl">
+                                    {result.prediction}
+                                </p>
                                 {confidenceDisplay && (
                                     <>
-                                        <p className="text-sm text-muted-foreground">
+                                        <p className="mt-4 text-xs text-muted-foreground sm:text-sm">
                                             Confidence
                                         </p>
-                                        <p className="text-xl font-medium">
+                                        <p className="text-lg font-medium sm:text-xl md:text-2xl">
                                             {confidenceDisplay}
                                         </p>
                                     </>
                                 )}
                             </div>
                         ) : (
-                            <p className="text-muted-foreground">
+                            <p className="text-sm text-muted-foreground sm:text-base">
                                 Submit the form to see predictions here.
                             </p>
                         )}
