@@ -11,6 +11,6 @@ export const authClient = createAuthClient({
     plugins: [
         stripeClient({
             subscription: true
-        })
+        }) as any
     ]
 })

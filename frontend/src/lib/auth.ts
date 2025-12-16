@@ -111,7 +111,7 @@ export const auth = betterAuth({
                               const userId = eventDataObject.metadata?.userId
                           }
                       }
-                  })
+                  }) as any
               ]
             : [])
     ]
@@ -119,8 +119,8 @@ export const auth = betterAuth({
 
 export async function getActiveSubscription() {
     const nextHeaders = await headers()
-    const subscriptions = await auth.api.listActiveSubscriptions({
+    const subscriptions = await (auth.api as any).listActiveSubscriptions({
         headers: nextHeaders
     })
-    return subscriptions.find((s) => s.status === "active")
+    return subscriptions.find((s: any) => s.status === "active")
 }

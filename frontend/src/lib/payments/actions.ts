@@ -23,13 +23,13 @@ export async function getActiveSubscription(): Promise<{
     }
 
     try {
-        const activeSubs = await auth.api.listActiveSubscriptions({
+        const activeSubs = await (auth.api as any).listActiveSubscriptions({
             headers: await headers()
         })
         const activeSub =
             activeSubs.length > 1
                 ? activeSubs.find(
-                      (sub) =>
+                      (sub: any) =>
                           sub.status === "active" || sub.status === "trialing"
                   )
                 : activeSubs[0]
