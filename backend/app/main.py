@@ -5,6 +5,7 @@ Run locally with: uvicorn app.main:app --reload --port 8000
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,12 +15,24 @@ from app.model import predictor
 from app.routes import predict
 from app.utils.config import ALLOWED_ORIGINS
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ensure the model is loaded at startup so first request is fast."""
+    logger.info("Starting application...")
+    logger.info("Attempting to load model...")
+    # Call warmup - it won't raise exceptions anymore
     predictor.warmup()
+    logger.info("Application startup complete")
     yield
+    logger.info("Application shutting down...")
 
 
 app = FastAPI(

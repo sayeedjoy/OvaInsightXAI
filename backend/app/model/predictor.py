@@ -121,6 +121,12 @@ def warmup() -> None:
     except FileNotFoundError as exc:
         # Log loudly but allow the app to keep starting so health checks reveal the issue.
         logger.error("Unable to warm up model: %s", exc)
-        raise
+        logger.warning("Model file missing. Health check will report this issue.")
+        # Don't raise - let the app start so we can see the error via health check
+        # The app will start but prediction endpoints will fail
+    except Exception as exc:
+        # Log any other errors but don't crash the app
+        logger.error("Error during model warmup: %s", exc, exc_info=True)
+        logger.warning("Application will start but model may not be available")
 
 

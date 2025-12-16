@@ -9,11 +9,20 @@ APP_DIR = Path(__file__).resolve().parent.parent
 
 # Model path: Read from environment variable, default to Docker-friendly path
 # Falls back to relative path for local development if Docker path doesn't exist
+import logging
+logger = logging.getLogger(__name__)
+
 _model_path_env = os.getenv("MODEL_PATH", "/app/app/model/model.pkl")
 MODEL_PATH = Path(_model_path_env)
 # If Docker path doesn't exist and we're not in Docker, use relative path
 if not MODEL_PATH.exists() and not os.path.exists("/app"):
     MODEL_PATH = APP_DIR / "model" / "model.pkl"
+
+logger.info(f"MODEL_PATH configured as: {MODEL_PATH}")
+if MODEL_PATH.exists():
+    logger.info(f"Model file exists at: {MODEL_PATH}")
+else:
+    logger.warning(f"Model file does NOT exist at: {MODEL_PATH}")
 
 # Frontend origins allowed to access the API.
 # Read from environment variable (comma-separated), default to localhost for development
