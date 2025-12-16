@@ -1,0 +1,73 @@
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.cursor/
+
+# ======================
+# Environment files
+# ======================
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+
+# ======================
+# Logs
+# ======================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+
+# ======================
+# Node / Frontend
+# ======================
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+.vercel/
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# ======================
+# Backend / Python
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.env/
+.venv/
+
+# ======================
+# Database / ORM
+# ======================
+*.sqlite
+*.db
+
+# ======================
+# Testing / Coverage
+# ======================
+coverage/
+.nyc_output/
+
+# ======================
+# Misc
+# ======================
+*.log
+/frontend/node_modules
