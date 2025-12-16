@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import logging
 import pickle
+from collections.abc import Mapping
 from pathlib import Path
-from typing import NamedTuple, Sequence, Union
+from typing import Any, NamedTuple, Sequence, Union
 
 from app.utils.config import MODEL_PATH, validate_feature_iterable
 
 logger = logging.getLogger(__name__)
 
 _MODEL = None
+_MODEL_ARTIFACT: Any = None
 _SUPPORTS_PROBA = False
 
 
@@ -39,13 +41,48 @@ def _load_model(path: Path):
         return pickle.load(handle)
 
 
+def _extract_estimator(artifact: Any):
+    """
+    Return the actual estimator object from the loaded artifact.
+
+    Some training scripts persist additional metadata (scalers, configs, etc.)
+    in a dict. We only need the object that implements predict()/predict_proba.
+    """
+
+    if hasattr(artifact, "predict"):
+        return artifact
+
+    if isinstance(artifact, Mapping):
+        candidate_keys = (
+            "model",
+            "estimator",
+            "classifier",
+            "meta_logreg",
+        )
+        for key in candidate_keys:
+            value = artifact.get(key)
+            if value is not None and hasattr(value, "predict"):
+                logger.info("Extracted estimator from artifact key '%s'.", key)
+                return value
+        raise ValueError(
+            "Loaded model artifact is a mapping but none of the expected keys "
+            "('model', 'estimator', 'classifier', 'meta_logreg') contain a valid estimator."
+        )
+
+    raise TypeError(
+        f"Loaded artifact of type {type(artifact)!r} does not expose predict(). "
+        "Update predictor._extract_estimator to handle this format."
+    )
+
+
 def ensure_model_loaded() -> None:
     """Load the model into memory if it has not been loaded yet."""
-    global _MODEL, _SUPPORTS_PROBA
+    global _MODEL, _MODEL_ARTIFACT, _SUPPORTS_PROBA
     if _MODEL is not None:
         return
 
-    _MODEL = _load_model(MODEL_PATH)
+    _MODEL_ARTIFACT = _load_model(MODEL_PATH)
+    _MODEL = _extract_estimator(_MODEL_ARTIFACT)
     _SUPPORTS_PROBA = hasattr(_MODEL, "predict_proba")
     logger.info(
         "Model loaded (%s). Supports predict_proba=%s",

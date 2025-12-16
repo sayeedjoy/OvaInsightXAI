@@ -33,6 +33,9 @@ async def predict_endpoint(payload: PredictionRequest) -> PredictionResponse:
     except RuntimeError as exc:
         logger.error("Model not loaded: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    except ValueError as exc:
+        logger.error("Model inference failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
 
     return PredictionResponse(prediction=result.prediction, confidence=result.confidence)
 
