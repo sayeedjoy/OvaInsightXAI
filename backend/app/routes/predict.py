@@ -46,24 +46,66 @@ router = APIRouter(tags=["prediction"])
 async def predict_endpoint(payload: PredictionRequest) -> PredictionResponse:
     """Validate input, run inference, and return the model output."""
     try:
-        features = request_to_features(payload)
-    except FeatureOrderError as exc:
-        logger.warning("Invalid feature payload: %s", exc)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        # Convert request to features
+        try:
+            features = request_to_features(payload)
+        except FeatureOrderError as exc:
+            logger.warning("Invalid feature payload: %s", exc, exc_info=True)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        except Exception as exc:
+            logger.error("Unexpected error during feature preprocessing: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Feature preprocessing failed: {str(exc)}"
+            )
 
-    try:
-        result = predictor.predict(features)
-    except FileNotFoundError as exc:
-        logger.error("Model file missing: %s", exc)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
-    except RuntimeError as exc:
-        logger.error("Model not loaded: %s", exc)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
-    except ValueError as exc:
-        logger.error("Model inference failed: %s", exc)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        # Run prediction
+        try:
+            result = predictor.predict(features)
+        except FileNotFoundError as exc:
+            logger.error("Model file missing: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Model file not found: {str(exc)}"
+            )
+        except RuntimeError as exc:
+            logger.error("Model not loaded: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Model not loaded: {str(exc)}"
+            )
+        except ValueError as exc:
+            logger.error("Model inference failed: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Model inference error: {str(exc)}"
+            )
+        except Exception as exc:
+            logger.error("Unexpected error during prediction: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Prediction failed: {str(exc)}"
+            )
 
-    return PredictionResponse(prediction=result.prediction, confidence=result.confidence)
+        # Return response
+        try:
+            return PredictionResponse(prediction=result.prediction, confidence=result.confidence)
+        except Exception as exc:
+            logger.error("Error creating response: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create response: {str(exc)}"
+            )
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is
+        raise
+    except Exception as exc:
+        # Catch-all for any other unexpected exceptions
+        logger.error("Unexpected error in predict endpoint: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(exc)}"
+        )
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -93,7 +135,7 @@ async def get_negative_test_case() -> dict:
         test_case = generate_negative_cases(n=1, random_state=None)
         return test_case
     except Exception as exc:
-        logger.error("Failed to generate negative test case: %s", exc)
+        logger.error("Failed to generate negative test case: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate test case: {str(exc)}",
@@ -113,7 +155,7 @@ async def get_positive_test_case() -> dict:
         test_case = generate_positive_cases(n=1, random_state=None)
         return test_case
     except Exception as exc:
-        logger.error("Failed to generate positive test case: %s", exc)
+        logger.error("Failed to generate positive test case: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate test case: {str(exc)}",
