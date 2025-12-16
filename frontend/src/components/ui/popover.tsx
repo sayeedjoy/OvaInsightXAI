@@ -17,15 +17,20 @@ function PopoverTrigger({
     return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
 }
 
+interface PopoverContentProps
+    extends React.ComponentProps<typeof PopoverPrimitive.Content> {
+    children?: React.ReactNode
+    showArrow?: boolean
+}
+
 function PopoverContent({
     className,
     align = "center",
     sideOffset = 4,
     showArrow = false,
+    children,
     ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content> & {
-    showArrow?: boolean
-}) {
+}: PopoverContentProps) {
     return (
         <PopoverPrimitive.Portal>
             <PopoverPrimitive.Content
@@ -38,7 +43,7 @@ function PopoverContent({
                 )}
                 {...props}
             >
-                {props.children}
+                {children}
                 {showArrow && (
                     <PopoverPrimitive.Arrow className="-my-px fill-popover drop-shadow-[0_1px_0_hsl(var(--border))]" />
                 )}

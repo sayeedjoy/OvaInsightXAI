@@ -209,3 +209,4 @@ tmp/
 # Optional: Keep sensitive config files out
 # config/secrets.json
 # config/production.json
+/backend/app/model/model.pkl

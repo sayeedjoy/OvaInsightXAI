@@ -37,10 +37,15 @@ const TabsTrigger = React.forwardRef<
 ))
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
+interface TabsContentProps
+    extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content> {
+    children?: React.ReactNode
+}
+
 const TabsContent = React.forwardRef<
     React.ElementRef<typeof TabsPrimitive.Content>,
-    React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
+    TabsContentProps
+>(({ className, children, ...props }, ref) => (
     <TabsPrimitive.Content
         ref={ref}
         className={cn(
@@ -48,7 +53,9 @@ const TabsContent = React.forwardRef<
             className
         )}
         {...props}
-    />
+    >
+        {children}
+    </TabsPrimitive.Content>
 ))
 TabsContent.displayName = TabsPrimitive.Content.displayName
 
