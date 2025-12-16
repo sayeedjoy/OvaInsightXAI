@@ -151,14 +151,14 @@ dmypy.json
 # ======================
 # Machine Learning Models
 # ======================
-# Uncomment if model files are too large for Git
-# *.pkl
-# *.h5
-# *.hdf5
-# *.joblib
-# *.model
-# models/
-# weights/
+# Model files are too large for Git
+*.pkl
+*.h5
+*.hdf5
+*.joblib
+*.model
+models/
+weights/
 
 # ======================
 # Database Files
