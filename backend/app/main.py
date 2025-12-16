@@ -8,6 +8,9 @@ from __future__ import annotations
 import logging
 import traceback
 from contextlib import asynccontextmanager
+from pathlib import Path
+from urllib.request import urlretrieve
+from urllib.error import URLError
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -16,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from app.model import predictor
 from app.routes import predict
-from app.utils.config import ALLOWED_ORIGINS
+from app.utils.config import ALLOWED_ORIGINS, MODEL_PATH
 
 # Configure logging
 logging.basicConfig(
@@ -25,11 +28,71 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# S3 URL for model download
+MODEL_URL = "https://cdn.rumorscanner.net/files/model.pkl"
+
+
+def download_model_if_needed() -> bool:
+    """
+    Download the model from S3 URL if it doesn't exist at any configured path.
+    Returns True if download was successful, False otherwise.
+    """
+    # Check if model already exists
+    if MODEL_PATH.exists():
+        logger.info(f"Model already exists at {MODEL_PATH}, skipping download")
+        return True
+    
+    # Check alternative locations
+    alternative_paths = [
+        Path("/opt/models/model.pkl"),
+        Path("/app/app/model/model.pkl"),
+    ]
+    
+    for alt_path in alternative_paths:
+        if alt_path.exists():
+            logger.info(f"Model found at {alt_path}, skipping download")
+            return True
+    
+    # Model not found, attempt download
+    logger.info(f"Model not found, attempting to download from {MODEL_URL}")
+    
+    try:
+        # Ensure the target directory exists
+        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Download the model
+        logger.info(f"Downloading model to {MODEL_PATH}...")
+        urlretrieve(MODEL_URL, MODEL_PATH)
+        
+        # Verify download
+        if MODEL_PATH.exists():
+            file_size = MODEL_PATH.stat().st_size
+            logger.info(f"Model downloaded successfully (size: {file_size} bytes)")
+            return True
+        else:
+            logger.error("Model download completed but file not found")
+            return False
+            
+    except URLError as exc:
+        logger.warning(f"Failed to download model from {MODEL_URL}: {exc}")
+        logger.warning("Application will continue, but model loading may fail")
+        return False
+    except Exception as exc:
+        logger.error(f"Unexpected error during model download: {exc}", exc_info=True)
+        logger.warning("Application will continue, but model loading may fail")
+        return False
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ensure the model is loaded at startup so first request is fast."""
     logger.info("Starting application...")
+    
+    # Download model from S3 if needed
+    logger.info("Checking for model file...")
+    download_model_if_needed()
+    
+    # Attempt to load the model
     logger.info("Attempting to load model...")
     # Call warmup - it won't raise exceptions anymore
     predictor.warmup()

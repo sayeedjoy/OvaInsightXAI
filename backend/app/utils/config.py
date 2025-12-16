@@ -14,9 +14,31 @@ logger = logging.getLogger(__name__)
 
 _model_path_env = os.getenv("MODEL_PATH", "/app/app/model/model.pkl")
 MODEL_PATH = Path(_model_path_env)
-# If Docker path doesn't exist and we're not in Docker, use relative path
-if not MODEL_PATH.exists() and not os.path.exists("/app"):
-    MODEL_PATH = APP_DIR / "model" / "model.pkl"
+
+# Check multiple locations in order:
+# 1. MODEL_PATH environment variable (if set and exists)
+# 2. /app/app/model/model.pkl (default Docker path)
+# 3. /opt/models/model.pkl (fallback for manually uploaded models in Docker)
+# 4. Relative path app/model/model.pkl (for local development)
+
+if not MODEL_PATH.exists():
+    # Check if we're in Docker environment
+    in_docker = os.path.exists("/app")
+    
+    if in_docker:
+        # In Docker: check /opt/models/model.pkl as fallback
+        opt_model_path = Path("/opt/models/model.pkl")
+        if opt_model_path.exists():
+            MODEL_PATH = opt_model_path
+            logger.info(f"Using model from /opt/models/model.pkl")
+        else:
+            # Keep the default Docker path even if it doesn't exist yet
+            # (it might be downloaded during startup)
+            logger.info(f"Model not found at {MODEL_PATH} or /opt/models/model.pkl, will attempt download")
+    else:
+        # Not in Docker: use relative path for local development
+        MODEL_PATH = APP_DIR / "model" / "model.pkl"
+        logger.info(f"Using local development path: {MODEL_PATH}")
 
 logger.info(f"MODEL_PATH configured as: {MODEL_PATH}")
 if MODEL_PATH.exists():

@@ -59,6 +59,22 @@ async def predict_endpoint(payload: PredictionRequest) -> PredictionResponse:
                 detail=f"Feature preprocessing failed: {str(exc)}"
             )
 
+        # Ensure model is loaded before prediction
+        try:
+            predictor.ensure_model_loaded()
+        except FileNotFoundError as exc:
+            logger.error("Model file missing: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Model file not found: {str(exc)}"
+            )
+        except Exception as exc:
+            logger.error("Error loading model: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Failed to load model: {str(exc)}"
+            )
+
         # Run prediction
         try:
             result = predictor.predict(features)
