@@ -107,7 +107,7 @@ export function PredictionForm({
                             <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                                 <Button
                                     type="button"
-                                    variant="secondary"
+                                    variant="default"
                                     onClick={() => onFillTestCase("negative")}
                                     disabled={isSubmitting}
                                     className="w-full sm:w-auto sm:flex-1 lg:text-base lg:h-11"
@@ -116,7 +116,7 @@ export function PredictionForm({
                                 </Button>
                                 <Button
                                     type="button"
-                                    variant="secondary"
+                                    variant="default"
                                     onClick={() => onFillTestCase("positive")}
                                     disabled={isSubmitting}
                                     className="w-full sm:w-auto sm:flex-1 lg:text-base lg:h-11"

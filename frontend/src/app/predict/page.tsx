@@ -124,7 +124,6 @@ export default function PredictPage() {
 
     return (
         <>
-            <PredictionLoading isVisible={isSubmitting} />
             <div className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10 lg:px-10 xl:px-12">
                 <div className="mb-6 space-y-2 text-center sm:mb-8 lg:mb-12">
                     <h1 className="text-2xl font-semibold sm:text-3xl md:text-4xl lg:text-5xl">
@@ -135,15 +134,18 @@ export default function PredictPage() {
                         backend.
                     </p>
                 </div>
-                <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-10 xl:gap-12">
-                    <PredictionForm
-                        formValues={formValues}
-                        isSubmitting={isSubmitting}
-                        onInputChange={handleInputChange}
-                        onSubmit={handleSubmit}
-                        onReset={resetForm}
-                        onFillTestCase={handleFillTestCase}
-                    />
+                <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-10 xl:gap-12">
+                    <div className="relative">
+                        <PredictionLoading isVisible={isSubmitting} />
+                        <PredictionForm
+                            formValues={formValues}
+                            isSubmitting={isSubmitting}
+                            onInputChange={handleInputChange}
+                            onSubmit={handleSubmit}
+                            onReset={resetForm}
+                            onFillTestCase={handleFillTestCase}
+                        />
+                    </div>
                     <PredictionResultCard result={result} error={error} />
                 </div>
             </div>
