@@ -2,6 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Build version - increment to force rebuild with new training data
+# v2: Balanced classes for better predictions
+ARG BUILD_VERSION=v2
+
 # Install system dependencies for Python packages that need compilation
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -23,8 +27,10 @@ RUN rm -f /app/app/model/model.pkl && \
     test ! -f /app/app/model/model.pkl || (echo "ERROR: Old model still exists!" && exit 1)
 
 # Copy and run model retraining script to ensure model compatibility with installed sklearn version
+# BUILD_VERSION=$BUILD_VERSION forces cache invalidation when training data changes
 COPY retrain_model.py .
-RUN python retrain_model.py && \
+RUN echo "Building with version: $BUILD_VERSION" && \
+    python retrain_model.py && \
     rm retrain_model.py && \
     test -f /app/app/model/model.pkl || (echo "ERROR: Model file not created!" && exit 1) && \
     ls -lh /app/app/model/model.pkl && \
