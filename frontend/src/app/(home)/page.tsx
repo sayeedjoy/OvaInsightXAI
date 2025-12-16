@@ -48,15 +48,6 @@ export default function Home() {
     return (
         <>
             <HeroSection />
-            <LogoCloud />
-            <BenefitsSection />
-            <FeaturesSection />
-            <ServicesSection />
-            <TestimonialSection />
-            <TeamSection />
-            <CommunitySection />
-            <PricingSection />
-            <ContactSection />
             <FAQSection />
         </>
     )
