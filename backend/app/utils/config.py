@@ -1,14 +1,26 @@
 """Centralized configuration and constants for the FastAPI backend."""
 
+import os
 from pathlib import Path
 from typing import Iterable, Mapping
 
 # Paths
 APP_DIR = Path(__file__).resolve().parent.parent
-MODEL_PATH = APP_DIR / "model" / "model.pkl"
+
+# Model path: Read from environment variable, default to Docker-friendly path
+# Falls back to relative path for local development if Docker path doesn't exist
+_model_path_env = os.getenv("MODEL_PATH", "/app/app/model/model.pkl")
+MODEL_PATH = Path(_model_path_env)
+# If Docker path doesn't exist and we're not in Docker, use relative path
+if not MODEL_PATH.exists() and not os.path.exists("/app"):
+    MODEL_PATH = APP_DIR / "model" / "model.pkl"
 
 # Frontend origins allowed to access the API.
-ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
+# Read from environment variable (comma-separated), default to localhost for development
+_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS: list[str] = [
+    origin.strip() for origin in _origins_env.split(",") if origin.strip()
+]
 
 # Ordered list of feature keys used by the ML model.
 FEATURE_ORDER: list[str] = [

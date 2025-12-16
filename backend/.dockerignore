@@ -1,0 +1,63 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+virtualenv/
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Model file (will be mounted as volume)
+app/model/model.pkl
+
+# Documentation
+*.md
+README.md
+HostGuide.md
+
+# Test files
+test_*.py
+*_test.py
+tests/
+
+# Scripts (not needed in container)
+scripts/
+retrain_model.py
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+wheels/
+*.whl
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
