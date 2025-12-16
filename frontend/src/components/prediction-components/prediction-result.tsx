@@ -92,12 +92,12 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
     const IconComponent = predictionDisplay?.icon
 
     return (
-        <Card className="h-fit w-full lg:sticky lg:top-6">
-            <CardHeader className="pb-4 sm:pb-6">
-                <CardTitle className="text-lg font-semibold sm:text-xl">
+        <Card className="h-fit w-full lg:sticky lg:top-6 lg:shadow-lg">
+            <CardHeader className="pb-4 sm:pb-6 lg:pb-6">
+                <CardTitle className="text-lg font-semibold sm:text-xl lg:text-xl">
                     Prediction Result
                 </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
+                <CardDescription className="text-xs sm:text-sm lg:text-sm">
                     Analysis based on the provided biomarker values
                 </CardDescription>
             </CardHeader>
@@ -121,14 +121,14 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
                 {result && predictionDisplay && IconComponent ? (
                     <div className="space-y-4 sm:space-y-6">
                         {/* Prediction Status */}
-                        <div className={`rounded-lg border ${predictionDisplay.borderColor} ${predictionDisplay.bgColor} p-4 sm:p-5`}>
+                        <div className={`rounded-xl border-2 ${predictionDisplay.borderColor} ${predictionDisplay.bgColor} p-4 sm:p-5`}>
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-4">
-                                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background/80 sm:h-14 sm:w-14`}>
+                                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background/80 shadow-sm sm:h-14 sm:w-14`}>
                                     <IconComponent className={`h-6 w-6 sm:h-7 sm:w-7 ${predictionDisplay.iconColor}`} />
                                 </div>
-                                <div className="flex-1 space-y-3 min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <h3 className="text-base font-semibold leading-tight sm:text-lg lg:text-xl">
+                                <div className="flex-1 space-y-3 min-w-0 lg:space-y-3">
+                                    <div className="flex flex-wrap items-center gap-2 lg:gap-2">
+                                        <h3 className="text-base font-semibold leading-tight sm:text-lg lg:text-lg">
                                             {predictionDisplay.label}
                                         </h3>
                                         <Badge 
@@ -140,7 +140,7 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
                                                 : "Low Risk"}
                                         </Badge>
                                     </div>
-                                    <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                                    <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm lg:text-sm lg:leading-relaxed">
                                         {predictionDisplay.description}
                                     </p>
                                 </div>
@@ -165,7 +165,7 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
                                 </div>
                                 <div className="space-y-3">
                                     <div className="flex items-baseline gap-2">
-                                        <span className={`text-2xl font-bold sm:text-3xl lg:text-4xl ${confidenceInfo.color}`}>
+                                        <span className={`text-2xl font-bold sm:text-3xl lg:text-3xl ${confidenceInfo.color}`}>
                                             {confidenceDisplay}
                                         </span>
                                     </div>
@@ -198,7 +198,7 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
                         <div className="rounded-lg border border-border bg-muted/50 p-3 sm:p-4">
                             <div className="flex items-start gap-2 sm:gap-3">
                                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground sm:h-5 sm:w-5" />
-                                <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                                <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm lg:leading-relaxed">
                                     <strong className="font-semibold text-foreground">Disclaimer:</strong>{" "}
                                     This prediction is based on machine learning analysis and should not replace 
                                     professional medical diagnosis. Always consult with qualified healthcare 

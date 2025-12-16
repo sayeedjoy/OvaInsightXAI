@@ -92,17 +92,17 @@ export default function PredictPage() {
     }
 
     return (
-        <div className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10 lg:px-10">
-            <div className="mb-6 space-y-2 text-center sm:mb-8">
-                <h1 className="text-2xl font-semibold sm:text-3xl md:text-4xl">
+        <div className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10 lg:px-10 xl:px-12">
+            <div className="mb-6 space-y-2 text-center sm:mb-8 lg:mb-12">
+                <h1 className="text-2xl font-semibold sm:text-3xl md:text-4xl lg:text-5xl">
                     Ovarian Cancer Prediction
                 </h1>
-                <p className="text-sm text-muted-foreground sm:text-base">
+                <p className="text-sm text-muted-foreground sm:text-base lg:text-lg max-w-2xl mx-auto">
                     Provide the 12 biomarkers below to run inference against the FastAPI
                     backend.
                 </p>
             </div>
-            <div className="grid gap-6 lg:grid-cols-[2fr_1fr] lg:gap-8">
+            <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-10 xl:gap-12">
                 <PredictionForm
                     formValues={formValues}
                     isSubmitting={isSubmitting}

@@ -47,22 +47,22 @@ export function PredictionForm({
 }: PredictionFormProps) {
     return (
         <Card>
-            <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Patient Metrics</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
+            <CardHeader className="pb-4 sm:pb-6">
+                <CardTitle className="text-lg sm:text-xl lg:text-2xl">Patient Metrics</CardTitle>
+                <CardDescription className="text-xs sm:text-sm lg:text-base">
                     All values are required. Use numeric values only.
                 </CardDescription>
             </CardHeader>
             <CardContent className="pt-4 sm:pt-6">
                 <form
-                    className="grid gap-4 sm:grid-cols-2 sm:gap-5"
+                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5 lg:gap-6"
                     onSubmit={onSubmit}
                 >
                     {FEATURE_FIELDS.map((field) => (
                         <div className="flex flex-col space-y-2" key={field.key}>
                             <Label 
                                 htmlFor={field.key}
-                                className="text-sm sm:text-base"
+                                className="text-sm sm:text-base lg:text-sm"
                             >
                                 {field.label}
                             </Label>
@@ -78,15 +78,15 @@ export function PredictionForm({
                                 step="any"
                                 required
                                 disabled={isSubmitting}
-                                className="h-9 sm:h-10 text-sm sm:text-base"
+                                className="h-9 sm:h-10 lg:h-11 text-sm sm:text-base"
                             />
                         </div>
                     ))}
-                    <div className="flex flex-col gap-3 pt-2 sm:col-span-2 sm:flex-row">
+                    <div className="flex flex-col gap-3 pt-2 sm:col-span-2 lg:col-span-3 sm:flex-row">
                         <Button 
                             type="submit" 
                             disabled={isSubmitting}
-                            className="w-full sm:w-auto sm:flex-1"
+                            className="w-full sm:w-auto sm:flex-1 lg:text-base lg:h-11"
                         >
                             {isSubmitting ? "Predicting..." : "Run Prediction"}
                         </Button>
@@ -95,7 +95,7 @@ export function PredictionForm({
                             variant="outline"
                             onClick={onReset}
                             disabled={isSubmitting}
-                            className="w-full sm:w-auto"
+                            className="w-full sm:w-auto lg:text-base lg:h-11"
                         >
                             Reset
                         </Button>
