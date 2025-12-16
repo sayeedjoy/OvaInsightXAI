@@ -19,6 +19,8 @@ const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export const auth = betterAuth({
+    baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    secret: process.env.BETTER_AUTH_SECRET || "better-auth-secret-key-change-in-production",
     database: drizzleAdapter(db, {
         provider: "pg",
         usePlural: true,
@@ -75,39 +77,43 @@ export const auth = betterAuth({
         }
     },
     plugins: [
-        stripe({
-            stripeClient,
-            stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-            createCustomerOnSignUp: true,
-            subscription: {
-                enabled: true,
-                plans: plans,
-                getCheckoutSessionParams: async ({ user, plan }) => {
-                    const checkoutSession: {
-                        params: {
-                            subscription_data?: {
-                                trial_period_days: number
-                            }
-                        }
-                    } = {
-                        params: {}
-                    }
+        ...(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET
+            ? [
+                  stripe({
+                      stripeClient,
+                      stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+                      createCustomerOnSignUp: true,
+                      subscription: {
+                          enabled: true,
+                          plans: plans,
+                          getCheckoutSessionParams: async ({ user, plan }) => {
+                              const checkoutSession: {
+                                  params: {
+                                      subscription_data?: {
+                                          trial_period_days: number
+                                      }
+                                  }
+                              } = {
+                                  params: {}
+                              }
 
-                    if (user.trialAllowed) {
-                        checkoutSession.params.subscription_data = {
-                            trial_period_days: (plan as Plan).trialDays
-                        }
-                    }
+                              if (user.trialAllowed) {
+                                  checkoutSession.params.subscription_data = {
+                                      trial_period_days: (plan as Plan).trialDays
+                                  }
+                              }
 
-                    return checkoutSession
-                },
-                onSubscriptionComplete: async ({ event }) => {
-                    const eventDataObject = event.data
-                        .object as Stripe.Checkout.Session
-                    const userId = eventDataObject.metadata?.userId
-                }
-            }
-        })
+                              return checkoutSession
+                          },
+                          onSubscriptionComplete: async ({ event }) => {
+                              const eventDataObject = event.data
+                                  .object as Stripe.Checkout.Session
+                              const userId = eventDataObject.metadata?.userId
+                          }
+                      }
+                  })
+              ]
+            : [])
     ]
 })
 

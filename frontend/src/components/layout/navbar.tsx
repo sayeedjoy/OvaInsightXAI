@@ -1,7 +1,5 @@
 "use client"
-import { SignedIn, SignedOut, UserButton } from "@daveyplate/better-auth-ui"
 import { Menu, X } from "lucide-react"
-import { RiGithubFill } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
 import React from "react"
@@ -9,17 +7,14 @@ import { ModeToggle } from "./mode-toggle"
 import { Button } from "../ui/button"
 import {
     NavigationMenu,
-    NavigationMenuContent,
     NavigationMenuItem,
     NavigationMenuLink,
-    NavigationMenuList,
-    NavigationMenuTrigger
+    NavigationMenuList
 } from "../ui/navigation-menu"
 import { Separator } from "../ui/separator"
 import {
     Sheet,
     SheetContent,
-    SheetFooter,
     SheetHeader,
     SheetTitle,
     SheetTrigger
@@ -31,46 +26,22 @@ interface RouteProps {
     label: string
 }
 
-interface FeatureProps {
-    title: string
-    description: string
-}
-
 const routeList: RouteProps[] = [
     {
-        href: "#features",
-        label: "Features"
+        href: "/",
+        label: "Home"
     },
     {
-        href: "#testimonials",
-        label: "Testimonials"
+        href: "/predict",
+        label: "Prediction Test"
     },
     {
-        href: "#pricing",
-        label: "Pricing"
+        href: "#about",
+        label: "About Us"
     },
     {
         href: "#contact",
         label: "Contact"
-    }
-]
-
-const featureList: FeatureProps[] = [
-    {
-        title: "Showcase Your Value",
-        description:
-            "Highlight how your product solves user problems effectively."
-    },
-    {
-        title: "Build Trust",
-        description:
-            "Leverage social proof elements to establish trust and credibility."
-    },
-
-    {
-        title: "Scale Fast",
-        description:
-            "Built-in tools and integrations to help you scale your business."
     }
 ]
 
@@ -103,54 +74,6 @@ export const Navbar = () => {
                     <div className="hidden items-center space-x-1 lg:flex">
                         <NavigationMenu>
                             <NavigationMenuList className="space-x-2">
-                                <NavigationMenuItem>
-                                    <NavigationMenuTrigger className="h-auto bg-transparent px-4 py-2 font-medium text-foreground hover:bg-accent/50">
-                                        Solutions
-                                    </NavigationMenuTrigger>
-                                    <NavigationMenuContent>
-                                        <div className="grid w-[600px] grid-cols-2 gap-6 p-6">
-                                            <div className="relative overflow-hidden rounded-lg">
-                                                <Image
-                                                    src="/demo-img.png"
-                                                    alt="Product Demo"
-                                                    className="h-full w-full object-cover"
-                                                    width={300}
-                                                    height={200}
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                                            </div>
-                                            <ul className="flex flex-col gap-3">
-                                                {featureList.map(
-                                                    ({
-                                                        title,
-                                                        description
-                                                    }) => (
-                                                        <li key={title}>
-                                                            <NavigationMenuLink
-                                                                asChild
-                                                            >
-                                                                <Link
-                                                                    href="#features"
-                                                                    className="group block rounded-lg p-3 text-sm transition-colors hover:bg-accent/50"
-                                                                >
-                                                                    <p className="mb-1 font-semibold text-foreground leading-none group-hover:text-primary">
-                                                                        {title}
-                                                                    </p>
-                                                                    <p className="line-clamp-2 text-muted-foreground text-xs">
-                                                                        {
-                                                                            description
-                                                                        }
-                                                                    </p>
-                                                                </Link>
-                                                            </NavigationMenuLink>
-                                                        </li>
-                                                    )
-                                                )}
-                                            </ul>
-                                        </div>
-                                    </NavigationMenuContent>
-                                </NavigationMenuItem>
-
                                 {routeList.map(({ href, label }) => (
                                     <NavigationMenuItem key={href}>
                                         <NavigationMenuLink asChild>
@@ -169,71 +92,11 @@ export const Navbar = () => {
 
                     {/* Desktop Actions */}
                     <div className="hidden items-center gap-2 lg:flex">
-                    <Button
-                            asChild
-                            variant="outline"
-                            size="icon"
-                            className="size-10 rounded-full"
-                        >
-                            <Link
-                                href={site.links.github}
-                                target="_blank"
-                                aria-label="View on GitHub"
-                            >
-                                <RiGithubFill className="size-5 fill-foreground" />
-                            </Link>
-                        </Button>
                         <ModeToggle />
-                        
-                        <SignedOut>
-                            <Button
-                                asChild
-                                size="sm"
-                                variant="outline"
-                                className="ml-2"
-                            >
-                                <Link href="/auth/sign-in?redirectTo=/dashboard">
-                                    Sign In
-                                </Link>
-                            </Button>
-                            <Button
-                                asChild
-                                size="sm"
-                                className="bg-primary hover:bg-primary/90"
-                            >
-                                <Link href="/auth/sign-up?redirectTo=/dashboard">
-                                    Get Started
-                                </Link>
-                            </Button>
-                        </SignedOut>
-                        <SignedIn>
-                            <Button
-                                asChild
-                                size="sm"
-                                variant="outline"
-                                className="ml-2"
-                            >
-                                <Link href="/dashboard">Dashboard</Link>
-                            </Button>
-                        </SignedIn>
                     </div>
 
                     {/* Mobile Menu Button */}
                     <div className="flex items-center gap-2 lg:hidden">
-                        <Button
-                            asChild
-                            variant="outline"
-                            size="icon"
-                            className="size-10 rounded-full"
-                        >
-                            <Link
-                                href={site.links.github}
-                                target="_blank"
-                                aria-label="View on GitHub"
-                            >
-                                <RiGithubFill className="size-5 fill-foreground" />
-                            </Link>
-                        </Button>
                         <ModeToggle />
                         <Sheet open={isOpen} onOpenChange={setIsOpen}>
                             <SheetTrigger asChild>
@@ -300,46 +163,6 @@ export const Navbar = () => {
                                             )}
                                         </div>
                                     </div>
-
-                                    {/* Mobile Actions */}
-                                    <SheetFooter className="flex-row gap-2 border-border/50 border-t pt-4">
-                                        <SignedOut>
-                                            <Button
-                                                asChild
-                                                variant="outline"
-                                                className="w-full"
-                                                onClick={() => setIsOpen(false)}
-                                            >
-                                                <Link href="/auth/sign-in?redirectTo=/dashboard">
-                                                    Sign In
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                asChild
-                                                className="w-full bg-primary hover:bg-primary/90"
-                                                onClick={() => setIsOpen(false)}
-                                            >
-                                                <Link href="/auth/sign-up?redirectTo=/dashboard">
-                                                    Get Started
-                                                </Link>
-                                            </Button>
-                                        </SignedOut>
-                                        <SignedIn>
-                                            <Button
-                                                asChild
-                                                variant="outline"
-                                                className="w-full"
-                                                onClick={() => setIsOpen(false)}
-                                            >
-                                                <Link href="/dashboard">
-                                                    Dashboard
-                                                </Link>
-                                            </Button>
-                                            <div className="flex justify-end pt-2">
-                                                <UserButton size="icon" />
-                                            </div>
-                                        </SignedIn>
-                                    </SheetFooter>
                                 </div>
                             </SheetContent>
                         </Sheet>

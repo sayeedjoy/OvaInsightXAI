@@ -24,7 +24,6 @@ export function Providers({ children }: { children: ReactNode }) {
                 authClient={authClient}
                 navigate={router.push}
                 replace={router.replace}
-                apiKey={true}
                 onSessionChange={() => {
                     router.refresh()
                 }}

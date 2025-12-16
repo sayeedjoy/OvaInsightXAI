@@ -21,7 +21,7 @@ export const HeroSection = () => {
                                 Healthcare AI
                             </Badge>
                         </span>
-                        <span>Early Detection Saves Lives</span>
+                
                     </Badge>
 
                     <div className="font-bold text-4xl md:text-5xl lg:text-6xl">
