@@ -1,30 +1,31 @@
 # Dokploy Deployment Configuration
 
-## Important: Root Directory Configuration
+## ⚠️ CRITICAL: Use Dockerfile Build Method
 
-When deploying to Dokploy, you **MUST** set the **Root Directory** to `backend` in the Dokploy dashboard.
+**You MUST select "Dockerfile" as the build method in Dokploy dashboard to use Docker instead of Nixpacks.**
 
-### Steps to Configure Dokploy:
+### Steps to Configure Dokploy (Dockerfile Method):
 
 1. **Create New Application** in Dokploy
 2. **Connect your Git repository**
-3. **Set Root Directory**: `backend`
-4. **Build Command**: Leave empty (or use `pip install -r requirements.txt`)
-5. **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+3. **Set Root Directory**: `backend` (IMPORTANT: Must be exactly `backend`, not `backend/backend`)
+4. **Select Build Method**: Choose **"Dockerfile"** (NOT "Nixpacks" or "Auto-detect")
+5. **Build Command**: Leave empty (Dockerfile handles the build)
+6. **Start Command**: Leave empty (Dockerfile CMD handles startup)
+7. **Dockerfile Path**: Should auto-detect as `Dockerfile` (since Root Directory is `backend`)
 
-### Why This is Important:
+### Why Dockerfile is Required:
 
-- Dokploy/Nixpacks will auto-detect the frontend directory if Root Directory is not set
-- The frontend requires `pnpm-lock.yaml` which may not be present
-- Setting Root Directory to `backend` ensures only the Python backend is built
+- Nixpacks has issues with Python virtual environments and start commands
+- Dockerfile provides consistent, reliable builds
+- Better control over the build process and dependencies
+- Supports volume mounting for the model file
 
-### Alternative: Use Dockerfile
+### If You See Nixpacks Errors:
 
-If you prefer to use Docker instead of Nixpacks:
-
-1. In Dokploy, select **"Dockerfile"** as the build method
-2. Set **Root Directory** to `backend`
-3. Dokploy will use `backend/Dockerfile` automatically
+- ✅ **Solution 1**: In Dokploy dashboard, explicitly select **"Dockerfile"** as build method
+- ✅ **Solution 2**: Ensure Root Directory is set to `backend` (not `backend/backend`)
+- ✅ **Solution 3**: Check that `backend/Dockerfile` exists in your repository
 
 ### Environment Variables:
 

@@ -1,0 +1,4 @@
+# Ignore this directory for Nixpacks
+# Force Dokploy to use Dockerfile instead
+*
+
