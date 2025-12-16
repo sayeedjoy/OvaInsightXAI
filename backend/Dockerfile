@@ -11,12 +11,16 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Ensure model directory exists and remove any old incompatible model BEFORE copying app code
+RUN mkdir -p /app/app/model && \
+    rm -rf /app/app/model/model.pkl
+
+# Copy application code (this may include old model.pkl, but we'll remove it and retrain)
 COPY app/ ./app/
 
-# Ensure model directory exists and remove any old incompatible model
-RUN mkdir -p /app/app/model && \
-    rm -f /app/app/model/model.pkl
+# Force remove any old model that might have been copied with app code
+RUN rm -f /app/app/model/model.pkl && \
+    test ! -f /app/app/model/model.pkl || (echo "ERROR: Old model still exists!" && exit 1)
 
 # Copy and run model retraining script to ensure model compatibility with installed sklearn version
 COPY retrain_model.py .

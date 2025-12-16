@@ -105,11 +105,21 @@ def train_and_save_model():
         model_path.unlink()
     
     # Log sklearn version for debugging
-    print(f"scikit-learn version: {sklearn.__version__}")
+    sklearn_version = sklearn.__version__
+    print(f"scikit-learn version: {sklearn_version}")
     
-    # Save the model
+    # Save the model with metadata including sklearn version
+    # Wrap the pipeline in a dict with metadata for version verification
+    model_with_metadata = {
+        "pipeline": pipeline,
+        "sklearn_version": sklearn_version,
+        "model_type": "LogisticRegression",
+        "trained_at": __import__("datetime").datetime.now().isoformat()
+    }
+    
     print(f"Saving model to {model_path} (absolute: {model_path.resolve()})...")
-    joblib.dump(pipeline, model_path)
+    print(f"Model trained with sklearn version: {sklearn_version}")
+    joblib.dump(model_with_metadata, model_path)
     
     # Verify the model file was created
     if not model_path.exists():
@@ -132,7 +142,20 @@ def train_and_save_model():
     
     # Verify we can load the saved model
     print("Verifying saved model can be loaded...")
-    loaded_model = joblib.load(model_path)
+    loaded_artifact = joblib.load(model_path)
+    
+    # Extract the pipeline from metadata dict
+    if isinstance(loaded_artifact, dict) and "pipeline" in loaded_artifact:
+        loaded_model = loaded_artifact["pipeline"]
+        loaded_sklearn_version = loaded_artifact.get("sklearn_version", "unknown")
+        print(f"Loaded model was trained with sklearn version: {loaded_sklearn_version}")
+        if loaded_sklearn_version != sklearn_version:
+            print(f"WARNING: Model sklearn version ({loaded_sklearn_version}) differs from current ({sklearn_version})")
+    else:
+        # Fallback for models saved without metadata
+        loaded_model = loaded_artifact
+        print("WARNING: Model does not contain version metadata")
+    
     loaded_prediction = loaded_model.predict(test_sample)
     loaded_proba = loaded_model.predict_proba(test_sample)
     print(f"Loaded model test prediction: {loaded_prediction[0]}, confidence: {max(loaded_proba[0]):.3f}")

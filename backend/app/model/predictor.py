@@ -43,7 +43,38 @@ def _load_model(path: Path):
     if joblib:
         logger.info("Loading model via joblib from %s", path)
         try:
-            return joblib.load(path)
+            artifact = joblib.load(path)
+            
+            # Check if model has metadata and verify sklearn version
+            if isinstance(artifact, Mapping) and "pipeline" in artifact:
+                model_sklearn_version = artifact.get("sklearn_version", "unknown")
+                logger.info("Model was trained with sklearn version: %s", model_sklearn_version)
+                
+                if model_sklearn_version != "unknown" and model_sklearn_version != sklearn_version:
+                    logger.warning(
+                        "Model sklearn version (%s) differs from current version (%s). "
+                        "This may cause compatibility issues.",
+                        model_sklearn_version,
+                        sklearn_version
+                    )
+                    # Try to extract and use the pipeline anyway
+                    if "pipeline" in artifact:
+                        return artifact
+                    else:
+                        raise ValueError(
+                            f"Model metadata indicates sklearn version {model_sklearn_version}, "
+                            f"but current version is {sklearn_version}. Model may be incompatible."
+                        )
+                # Return the artifact with metadata for _extract_estimator to handle
+                return artifact
+            else:
+                # Old format model without metadata - log warning
+                logger.warning(
+                    "Model does not contain version metadata. "
+                    "It may have been trained with a different sklearn version."
+                )
+                return artifact
+                
         except (AttributeError, TypeError) as exc:
             if "_fill_dtype" in str(exc) or "has no attribute" in str(exc):
                 logger.error(
@@ -75,6 +106,15 @@ def _extract_estimator(artifact: Any):
         return artifact
 
     if isinstance(artifact, Mapping):
+        # First check for new format with "pipeline" key (from retrain_model.py)
+        if "pipeline" in artifact:
+            pipeline = artifact["pipeline"]
+            if hasattr(pipeline, "predict"):
+                logger.info("Extracted pipeline from artifact with sklearn version: %s", 
+                          artifact.get("sklearn_version", "unknown"))
+                return pipeline
+        
+        # Fallback to old format keys
         candidate_keys = (
             "model",
             "estimator",
@@ -88,7 +128,7 @@ def _extract_estimator(artifact: Any):
                 return value
         raise ValueError(
             "Loaded model artifact is a mapping but none of the expected keys "
-            "('model', 'estimator', 'classifier', 'meta_logreg') contain a valid estimator."
+            "('pipeline', 'model', 'estimator', 'classifier', 'meta_logreg') contain a valid estimator."
         )
 
     raise TypeError(
