@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, NamedTuple, Sequence, Union
 
-from app.utils.config import MODEL_PATH, validate_feature_iterable
+from app.utils.config import FEATURE_ORDER, MODEL_PATH, validate_feature_iterable
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,94 @@ DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 _MODEL = None
 _MODEL_ARTIFACT: Any = None
 _SUPPORTS_PROBA = False
+_LOADED_MODEL_PATH: Path | None = None
+
+
+def _expected_feature_count() -> int:
+    return len(FEATURE_ORDER)
+
+
+def _get_model_feature_count(model: Any) -> int | None:
+    """
+    Try to determine the number of features the loaded estimator expects.
+
+    Most sklearn estimators expose `n_features_in_` after fitting.
+    """
+    n = getattr(model, "n_features_in_", None)
+    if isinstance(n, int):
+        return n
+    try:
+        return int(n) if n is not None else None
+    except Exception:
+        return None
+
+
+def _validate_model_feature_count(model: Any, *, model_path: Path) -> None:
+    expected = _expected_feature_count()
+    actual = _get_model_feature_count(model)
+    if actual is None:
+        logger.warning(
+            "Loaded model does not expose n_features_in_; cannot validate feature count. path=%s type=%s",
+            model_path,
+            type(model).__name__,
+        )
+        return
+
+    if actual != expected:
+        raise ValueError(
+            f"Loaded model expects {actual} features but API is configured for {expected}. "
+            f"Fix the model file or unset MODEL_PATH. Loaded from: {model_path}"
+        )
+
+
+def _candidate_model_paths(primary: Path) -> list[Path]:
+    """
+    Return a list of paths to try, in order.
+
+    This helps in Docker deployments where MODEL_PATH may point to a mounted file
+    that is missing or outdated, while the image contains a baked model.
+    """
+    candidates: list[Path] = []
+
+    def add(p: Path) -> None:
+        if p not in candidates:
+            candidates.append(p)
+
+    add(primary)
+
+    in_docker = Path("/app").exists()
+    if in_docker:
+        add(Path("/app/app/model/model.pkl"))
+        add(Path("/opt/models/model.pkl"))
+
+    return candidates
+
+
+def _load_and_extract(path: Path) -> tuple[Any, Any]:
+    """Load artifact from path and extract estimator/pipeline."""
+    _retrain_model_if_needed(path)
+    artifact = _load_model(path)
+    model = _extract_estimator(artifact)
+    return artifact, model
+
+
+def get_model_info() -> dict[str, Any]:
+    """
+    Return debug information about the model selection and feature expectations.
+
+    Intended for operational debugging (e.g., verifying VPS loads the correct model).
+    """
+    expected = _expected_feature_count()
+    info: dict[str, Any] = {
+        "configured_model_path": str(MODEL_PATH),
+        "configured_model_path_exists": MODEL_PATH.exists(),
+        "expected_feature_count": expected,
+        "loaded_model_path": str(_LOADED_MODEL_PATH) if _LOADED_MODEL_PATH else None,
+        "loaded_model_type": type(_MODEL).__name__ if _MODEL is not None else None,
+        "loaded_model_feature_count": _get_model_feature_count(_MODEL) if _MODEL is not None else None,
+        "candidate_paths": [str(p) for p in _candidate_model_paths(MODEL_PATH)],
+    }
+    return info
 
 
 class PredictionResult(NamedTuple):
@@ -336,7 +424,7 @@ def _retrain_model_if_needed(model_path: Path) -> bool:
 
 def ensure_model_loaded() -> None:
     """Load the model into memory if it has not been loaded yet."""
-    global _MODEL, _MODEL_ARTIFACT, _SUPPORTS_PROBA
+    global _MODEL, _MODEL_ARTIFACT, _SUPPORTS_PROBA, _LOADED_MODEL_PATH
     if _MODEL is not None:
         return
 
@@ -354,12 +442,34 @@ def ensure_model_loaded() -> None:
     except: pass
     # #endregion
     
-    # Check and retrain if needed before loading
-    _retrain_model_if_needed(MODEL_PATH)
-    
-    _MODEL_ARTIFACT = _load_model(MODEL_PATH)
-    _MODEL = _extract_estimator(_MODEL_ARTIFACT)
-    _SUPPORTS_PROBA = hasattr(_MODEL, "predict_proba")
+    strict = os.getenv("STRICT_MODEL_FEATURES", "0") == "1"
+    last_error: Exception | None = None
+    for candidate in _candidate_model_paths(MODEL_PATH):
+        try:
+            artifact, model = _load_and_extract(candidate)
+            _validate_model_feature_count(model, model_path=candidate)
+
+            _MODEL_ARTIFACT = artifact
+            _MODEL = model
+            _SUPPORTS_PROBA = hasattr(_MODEL, "predict_proba")
+            _LOADED_MODEL_PATH = candidate
+            if candidate != MODEL_PATH:
+                logger.warning(
+                    "Using fallback model path %s instead of configured MODEL_PATH=%s",
+                    candidate,
+                    MODEL_PATH,
+                )
+            break
+        except Exception as exc:
+            last_error = exc
+            if strict:
+                # Fail fast in strict mode (useful for production to avoid silent fallbacks).
+                raise
+            logger.warning("Model load failed for %s: %s", candidate, exc)
+            continue
+
+    if _MODEL is None:
+        raise RuntimeError("Unable to load a compatible model") from last_error
     
     # #region agent log
     try:

@@ -12,7 +12,11 @@ APP_DIR = Path(__file__).resolve().parent.parent
 import logging
 logger = logging.getLogger(__name__)
 
-_model_path_env = os.getenv("MODEL_PATH", "/app/app/model/model.pkl")
+_DEFAULT_DOCKER_MODEL_PATH = Path("/app/app/model/model.pkl")
+_OPT_DOCKER_MODEL_PATH = Path("/opt/models/model.pkl")
+
+_model_path_env = os.getenv("MODEL_PATH", str(_DEFAULT_DOCKER_MODEL_PATH))
+_model_path_env_set = "MODEL_PATH" in os.environ
 MODEL_PATH = Path(_model_path_env)
 
 # Check multiple locations in order:
@@ -24,21 +28,48 @@ MODEL_PATH = Path(_model_path_env)
 if not MODEL_PATH.exists():
     # Check if we're in Docker environment
     in_docker = os.path.exists("/app")
-    
+
     if in_docker:
-        # In Docker: check /opt/models/model.pkl as fallback
-        opt_model_path = Path("/opt/models/model.pkl")
-        if opt_model_path.exists():
-            MODEL_PATH = opt_model_path
-            logger.info(f"Using model from /opt/models/model.pkl")
+        # If MODEL_PATH env var was set but doesn't exist, try common Docker locations.
+        if _model_path_env_set:
+            if _DEFAULT_DOCKER_MODEL_PATH.exists():
+                MODEL_PATH = _DEFAULT_DOCKER_MODEL_PATH
+                logger.warning(
+                    "MODEL_PATH was set to %s but file does not exist; falling back to baked model at %s",
+                    _model_path_env,
+                    MODEL_PATH,
+                )
+            elif _OPT_DOCKER_MODEL_PATH.exists():
+                MODEL_PATH = _OPT_DOCKER_MODEL_PATH
+                logger.warning(
+                    "MODEL_PATH was set to %s but file does not exist; falling back to %s",
+                    _model_path_env,
+                    MODEL_PATH,
+                )
+            else:
+                # Keep env-provided path; app startup may attempt download depending on config.
+                logger.warning(
+                    "MODEL_PATH was set to %s but no model file found at fallback locations (%s, %s).",
+                    _model_path_env,
+                    _DEFAULT_DOCKER_MODEL_PATH,
+                    _OPT_DOCKER_MODEL_PATH,
+                )
         else:
-            # Keep the default Docker path even if it doesn't exist yet
-            # (it might be downloaded during startup)
-            logger.info(f"Model not found at {MODEL_PATH} or /opt/models/model.pkl, will attempt download")
+            # Env var not set: prefer baked image model, then /opt/models.
+            if _DEFAULT_DOCKER_MODEL_PATH.exists():
+                MODEL_PATH = _DEFAULT_DOCKER_MODEL_PATH
+                logger.info("Using baked Docker model path: %s", MODEL_PATH)
+            elif _OPT_DOCKER_MODEL_PATH.exists():
+                MODEL_PATH = _OPT_DOCKER_MODEL_PATH
+                logger.info("Using model from %s", MODEL_PATH)
+            else:
+                # Keep the default docker path even if it doesn't exist yet (it might be downloaded at startup).
+                MODEL_PATH = _DEFAULT_DOCKER_MODEL_PATH
+                logger.info("Model not found yet; will use %s (startup may attempt download)", MODEL_PATH)
     else:
         # Not in Docker: use relative path for local development
         MODEL_PATH = APP_DIR / "model" / "model.pkl"
-        logger.info(f"Using local development path: {MODEL_PATH}")
+        logger.info("Using local development path: %s", MODEL_PATH)
 
 logger.info(f"MODEL_PATH configured as: {MODEL_PATH}")
 if MODEL_PATH.exists():

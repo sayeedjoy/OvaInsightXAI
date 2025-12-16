@@ -134,8 +134,26 @@ async def health() -> HealthResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Model file missing",
         )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Model not ready: {str(exc)}",
+        )
 
     return HealthResponse(status="ok")
+
+
+@router.get("/model-info")
+async def model_info() -> dict:
+    """
+    Operational debug endpoint: shows which model path is used and feature counts.
+    """
+    try:
+        predictor.ensure_model_loaded()
+    except Exception:
+        # Still return useful info even if model didn't load
+        return predictor.get_model_info()
+    return predictor.get_model_info()
 
 
 @router.get("/test-case/negative")

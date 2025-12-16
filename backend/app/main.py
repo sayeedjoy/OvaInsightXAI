@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import traceback
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.request import urlretrieve
@@ -37,6 +38,17 @@ def download_model_if_needed() -> bool:
     Download the model from S3 URL if it doesn't exist at any configured path.
     Returns True if download was successful, False otherwise.
     """
+    # If MODEL_PATH was explicitly provided by env var, don't overwrite it by default.
+    # This prevents silently downloading an old/incompatible model into a custom mount path.
+    if "MODEL_PATH" in os.environ and os.getenv("ALLOW_MODEL_DOWNLOAD", "0") != "1":
+        if not MODEL_PATH.exists():
+            logger.warning(
+                "MODEL_PATH is set to %s but file does not exist. "
+                "Skipping auto-download because ALLOW_MODEL_DOWNLOAD!=1.",
+                MODEL_PATH,
+            )
+        return MODEL_PATH.exists()
+
     # Check if model already exists
     if MODEL_PATH.exists():
         logger.info(f"Model already exists at {MODEL_PATH}, skipping download")
