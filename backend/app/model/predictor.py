@@ -110,6 +110,24 @@ def _load_model(path: Path):
                 )
                 return artifact
                 
+        except (ModuleNotFoundError, ImportError) as exc:
+            # #region agent log
+            try:
+                with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:_load_model:import_error", "message": "Missing module during model load", "data": {"error_type": type(exc).__name__, "error_message": str(exc), "module_name": str(exc).split("'")[1] if "'" in str(exc) else "unknown"}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            except: pass
+            # #endregion
+            missing_module = str(exc).split("'")[1] if "'" in str(exc) else "unknown module"
+            logger.error(
+                "Failed to load model: missing required module '%s'. "
+                "Please install it (e.g., 'pip install %s') and restart the application.",
+                missing_module,
+                missing_module
+            )
+            raise ImportError(
+                f"Model requires module '{missing_module}' which is not installed. "
+                f"Please install it (e.g., 'pip install {missing_module}') and restart the application."
+            ) from exc
         except (AttributeError, TypeError) as exc:
             # #region agent log
             try:
@@ -131,8 +149,27 @@ def _load_model(path: Path):
             raise
 
     logger.info("Joblib unavailable, falling back to pickle for %s", path)
-    with path.open("rb") as handle:
-        return pickle.load(handle)
+    try:
+        with path.open("rb") as handle:
+            return pickle.load(handle)
+    except (ModuleNotFoundError, ImportError) as exc:
+        # #region agent log
+        try:
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:_load_model:pickle_import_error", "message": "Missing module during pickle load", "data": {"error_type": type(exc).__name__, "error_message": str(exc), "module_name": str(exc).split("'")[1] if "'" in str(exc) else "unknown"}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+        except: pass
+        # #endregion
+        missing_module = str(exc).split("'")[1] if "'" in str(exc) else "unknown module"
+        logger.error(
+            "Failed to load model via pickle: missing required module '%s'. "
+            "Please install it (e.g., 'pip install %s') and restart the application.",
+            missing_module,
+            missing_module
+        )
+        raise ImportError(
+            f"Model requires module '{missing_module}' which is not installed. "
+            f"Please install it (e.g., 'pip install {missing_module}') and restart the application."
+        ) from exc
 
 
 def _extract_estimator(artifact: Any):
