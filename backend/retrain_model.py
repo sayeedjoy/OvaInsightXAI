@@ -34,37 +34,56 @@ FEATURE_NAMES = [
 ]
 
 def create_synthetic_data(n_samples=1000, random_state=42):
-    """Create synthetic training data for demonstration."""
+    """Create synthetic training data with balanced classes and clear separation."""
     np.random.seed(random_state)
     
-    # Generate synthetic feature data with realistic ranges
-    data = {
-        "age": np.random.normal(55, 15, n_samples).clip(20, 90),
-        "alb": np.random.normal(4.0, 0.5, n_samples).clip(2.5, 5.5),
-        "alp": np.random.normal(70, 25, n_samples).clip(30, 150),
-        "bun": np.random.normal(15, 5, n_samples).clip(5, 40),
-        "ca125": np.random.exponential(50, n_samples).clip(5, 500),
-        "eo_abs": np.random.normal(0.2, 0.1, n_samples).clip(0, 0.8),
-        "ggt": np.random.normal(30, 20, n_samples).clip(5, 150),
-        "he4": np.random.exponential(70, n_samples).clip(20, 500),
-        "mch": np.random.normal(29, 3, n_samples).clip(20, 38),
-        "mono_abs": np.random.normal(0.5, 0.2, n_samples).clip(0.1, 1.2),
-        "na": np.random.normal(140, 3, n_samples).clip(130, 150),
-        "pdw": np.random.normal(12, 2, n_samples).clip(8, 20),
+    # Create balanced dataset: 50% positive, 50% negative
+    n_positive = n_samples // 2
+    n_negative = n_samples - n_positive
+    
+    # Generate NEGATIVE cases (healthy patients)
+    negative_data = {
+        "age": np.random.normal(45, 12, n_negative).clip(20, 75),
+        "alb": np.random.normal(4.2, 0.3, n_negative).clip(3.5, 5.0),  # Normal albumin
+        "alp": np.random.normal(70, 20, n_negative).clip(30, 120),  # Normal ALP
+        "bun": np.random.normal(14, 3, n_negative).clip(7, 20),
+        "ca125": np.random.normal(18, 8, n_negative).clip(5, 34),  # Normal CA125 < 35
+        "eo_abs": np.random.normal(0.2, 0.08, n_negative).clip(0.05, 0.5),
+        "ggt": np.random.normal(25, 10, n_negative).clip(5, 40),  # Normal GGT
+        "he4": np.random.normal(50, 12, n_negative).clip(30, 70),  # Normal HE4 < 70
+        "mch": np.random.normal(29, 1.5, n_negative).clip(27, 32),
+        "mono_abs": np.random.normal(0.5, 0.12, n_negative).clip(0.2, 0.8),
+        "na": np.random.normal(140, 2, n_negative).clip(136, 145),  # Normal sodium
+        "pdw": np.random.normal(11, 1.2, n_negative).clip(9, 14),
     }
     
-    X = np.column_stack([data[f] for f in FEATURE_NAMES])
+    # Generate POSITIVE cases (cancer patients) with elevated markers
+    positive_data = {
+        "age": np.random.normal(62, 10, n_positive).clip(40, 85),  # Older patients
+        "alb": np.random.normal(3.2, 0.4, n_positive).clip(2.5, 3.8),  # Low albumin
+        "alp": np.random.normal(160, 50, n_positive).clip(100, 300),  # Elevated ALP
+        "bun": np.random.normal(20, 5, n_positive).clip(12, 35),
+        "ca125": np.random.exponential(150, n_positive).clip(50, 500) + 35,  # Elevated CA125 > 35
+        "eo_abs": np.random.normal(0.35, 0.15, n_positive).clip(0.1, 0.7),
+        "ggt": np.random.normal(100, 40, n_positive).clip(45, 200),  # Elevated GGT
+        "he4": np.random.exponential(120, n_positive).clip(80, 500) + 70,  # Elevated HE4 > 70
+        "mch": np.random.normal(27, 2, n_positive).clip(24, 30),  # Slightly low
+        "mono_abs": np.random.normal(0.7, 0.2, n_positive).clip(0.3, 1.1),
+        "na": np.random.normal(136, 3, n_positive).clip(130, 140),  # Lower sodium
+        "pdw": np.random.normal(15, 2, n_positive).clip(12, 20),  # Elevated PDW
+    }
     
-    # Create synthetic labels based on key biomarkers (CA125 and HE4 are important for ovarian cancer)
-    # This is a simplified model for demonstration
-    risk_score = (
-        0.3 * (data["ca125"] > 35).astype(float) +
-        0.3 * (data["he4"] > 70).astype(float) +
-        0.2 * (data["age"] > 50).astype(float) +
-        0.1 * (data["alb"] < 3.5).astype(float) +
-        0.1 * np.random.random(n_samples)
-    )
-    y = (risk_score > 0.5).astype(int)
+    # Combine negative and positive data
+    X_negative = np.column_stack([negative_data[f] for f in FEATURE_NAMES])
+    X_positive = np.column_stack([positive_data[f] for f in FEATURE_NAMES])
+    
+    X = np.vstack([X_negative, X_positive])
+    y = np.concatenate([np.zeros(n_negative), np.ones(n_positive)]).astype(int)
+    
+    # Shuffle the data
+    shuffle_idx = np.random.permutation(n_samples)
+    X = X[shuffle_idx]
+    y = y[shuffle_idx]
     
     return X, y
 
