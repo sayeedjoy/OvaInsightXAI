@@ -12,7 +12,7 @@ import LogoCloud from "@/components/logo-cloud"
 import { site } from "@/config/site"
 
 export const metadata = {
-    title: site.name,
+    title: "Home",
     description: site.description,
     openGraph: {
         type: "website",
@@ -23,24 +23,16 @@ export const metadata = {
             {
                 url: site.ogImage,
                 width: 1200,
-                height: 750,
+                height: 630,
                 alt: site.name
             }
         ]
     },
     twitter: {
         card: "summary_large_image",
-        site: site.url,
         title: site.name,
         description: site.description,
-        images: [
-            {
-                url: site.ogImage,
-                width: 1200,
-                height: 750,
-                alt: site.name
-            }
-        ]
+        images: [site.ogImage]
     }
 }
 

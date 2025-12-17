@@ -33,7 +33,7 @@ export const CommunitySection = () => {
                         <CardFooter>
                             <Button asChild variant="outline">
                                 <a
-                                    href="https://github.com/indieceo/Indiesaas"
+                                    href="https://github.com/sayeedjoy/"
                                     target="_blank"
                                     rel="noopener"
                                     className="flex items-center gap-2"
