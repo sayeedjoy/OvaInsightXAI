@@ -19,11 +19,11 @@ const biomarkers = [
 
 export const HeroSection = () => {
     return (
-        <section className="relative w-full overflow-hidden bg-white py-16 md:py-24 lg:py-32 dark:bg-slate-950">
-            {/* Minimalist Background - Technical Grid from the plan */}
+        <section className="relative w-full overflow-hidden bg-[#fcfcfc] py-16 md:py-24 lg:py-32 dark:bg-[#121212]">
+            {/* Minimalist Background - Technical Grid */}
             <div className="absolute inset-0 z-0">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:40px_40px] opacity-20 dark:bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] dark:opacity-10" />
-                <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white to-transparent dark:from-slate-950" />
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:40px_40px] opacity-30 dark:bg-[linear-gradient(to_right,#2a2a2a_1px,transparent_1px),linear-gradient(to_bottom,#2a2a2a_1px,transparent_1px)] dark:opacity-40" />
+                <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#fcfcfc] to-transparent dark:from-[#121212]" />
             </div>
 
             <div className="container relative z-10 mx-auto px-4 md:px-6">
