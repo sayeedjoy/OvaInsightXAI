@@ -1,21 +1,8 @@
 "use client"
-import { ArrowRight, Activity, CheckCircle2, AlertCircle } from "lucide-react"
+import { ArrowRight, CheckCircle2, FileText, Brain, Shield } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { motion } from "framer-motion"
-
-// Biomarker data - Clinical Dataset style as per the realistic AI design
-const biomarkers = [
-    { name: "CA125", value: "85.2", unit: "U/mL", status: "high" },
-    { name: "HE4", value: "72.4", unit: "pmol/L", status: "normal" },
-    { name: "ALB", value: "4.2", unit: "g/dL", status: "normal" },
-    { name: "ALP", value: "58.0", unit: "IU/L", status: "normal" },
-    { name: "BUN", value: "12.8", unit: "mg/dL", status: "normal" },
-    { name: "GGT", value: "45.1", unit: "U/L", status: "low" },
-    { name: "Na+", value: "135", unit: "mEq/L", status: "normal" },
-    { name: "Neut%", value: "73.5", unit: "%", status: "high" },
-]
 
 export const HeroSection = () => {
     return (
@@ -63,16 +50,6 @@ export const HeroSection = () => {
                                     <ArrowRight className="ml-2 size-4" />
                                 </Link>
                             </Button>
-                            <Button
-                                asChild
-                                variant="outline"
-                                size="lg"
-                                className="h-12 border-slate-200 bg-transparent text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 px-8 text-base font-semibold"
-                            >
-                                <Link href="#features">
-                                    View Validation Data
-                                </Link>
-                            </Button>
                         </div>
 
                         {/* Validation Proof Points */}
@@ -92,73 +69,103 @@ export const HeroSection = () => {
                         </div>
                     </div>
 
-                    {/* Right Column: Dashboard Widget UI */}
+                    {/* Right Column: Process Flow Visualization */}
                     <div className="relative w-full mx-auto lg:mx-0">
-                        <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/50 lg:shadow-none dark:border-slate-800 dark:bg-slate-900 transition-shadow">
-                            {/* Widget Header */}
-                            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/50">
-                                <div className="flex items-center gap-3 text-left">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                                        <Activity className="size-5 text-teal-600" />
+                        <div className="relative flex flex-col items-center justify-center space-y-8 p-8">
+                            {/* Process Steps */}
+                            <div className="relative w-full space-y-6">
+                                {/* Step 1: Input Biomarkers */}
+                                <motion.div
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.1 }}
+                                    className="flex items-center gap-4"
+                                >
+                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-teal-100 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800">
+                                        <FileText className="size-6 text-teal-600 dark:text-teal-400" />
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-slate-900 dark:text-slate-100">Live Prediction Dashboard</h3>
-                                        <p className="text-xs text-slate-500 font-mono">ENCRYPTED_ID: #OVA-2024-X92</p>
+                                    <div className="flex-1">
+                                        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">
+                                            Input Biomarkers
+                                        </h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                                            12 clinical biomarkers analyzed
+                                        </p>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-100 dark:bg-teal-950/30 dark:border-teal-900">
-                                        <span className="flex h-2 w-2 rounded-full bg-teal-500 animate-pulse" />
-                                        <span className="text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider">AI Analysis Active</span>
+                                </motion.div>
+
+                                {/* Step 2: AI Analysis */}
+                                <motion.div
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.4 }}
+                                    className="flex items-center gap-4"
+                                >
+                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                                        <Brain className="size-6 text-slate-700 dark:text-slate-300" />
                                     </div>
-                                </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">
+                                            AI Analysis
+                                        </h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                                            Machine learning model processes data
+                                        </p>
+                                    </div>
+                                </motion.div>
+
+                                {/* Step 3: Risk Assessment */}
+                                <motion.div
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.7 }}
+                                    className="flex items-center gap-4"
+                                >
+                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
+                                        <Shield className="size-6 text-emerald-600 dark:text-emerald-400" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">
+                                            Risk Assessment
+                                        </h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                                            Instant results with 94.7% accuracy
+                                        </p>
+                                    </div>
+                                </motion.div>
                             </div>
 
-                            {/* Widget Content - Data Grid */}
-                            <div className="p-0">
-                                <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
-                                    {biomarkers.map((item, i) => (
-                                        <div key={item.name} className="flex flex-col p-5 group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <div className="mb-2 flex items-center justify-between">
-                                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tighter">{item.name}</span>
-                                                {item.status === 'high' && <AlertCircle className="size-3.5 text-red-500" />}
-                                                {item.status === 'low' && <AlertCircle className="size-3.5 text-amber-500" />}
-                                            </div>
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-2xl font-black text-slate-900 dark:text-slate-100 tabular-nums">{item.value}</span>
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase">{item.unit}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Prediction Result Area */}
-                                <div className="bg-slate-50 p-8 dark:bg-slate-900/80">
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Malignancy Probability</span>
-                                            <span className="font-mono text-slate-400 text-xs text-right">0.85s</span>
-                                        </div>
-                                        <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                                            <motion.div
-                                                initial={{ width: "0%" }}
-                                                animate={{ width: "12%" }}
-                                                transition={{ duration: 1.5, ease: "easeOut", delay: 0.5 }}
-                                                className="h-full bg-teal-600"
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-bold text-slate-500">Classification: <span className="text-emerald-600 dark:text-emerald-400 uppercase">Benign</span></span>
-                                            <span className="text-3xl font-black text-teal-700 dark:text-teal-400">12%</span>
-                                        </div>
-                                    </div>
-                                </div>
+                            {/* Key Metrics */}
+                            <div className="grid grid-cols-3 gap-4 w-full pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.9 }}
+                                    className="text-center"
+                                >
+                                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">12</div>
+                                    <div className="text-xs text-slate-600 dark:text-slate-400">Biomarkers</div>
+                                </motion.div>
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 1 }}
+                                    className="text-center"
+                                >
+                                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">94.7%</div>
+                                    <div className="text-xs text-slate-600 dark:text-slate-400">Accuracy</div>
+                                </motion.div>
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 1.1 }}
+                                    className="text-center"
+                                >
+                                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">&lt;1s</div>
+                                    <div className="text-xs text-slate-600 dark:text-slate-400">Response</div>
+                                </motion.div>
                             </div>
-                        </Card>
-
-                        {/* Depth elements hidden on desktop if they contribute to "shadowy" look */}
-                        <div className="absolute -left-16 top-1/2 -z-10 h-80 w-80 -translate-y-1/2 rounded-full bg-teal-100/30 blur-[100px] dark:bg-teal-900/10 lg:hidden" />
-                        <div className="absolute -right-16 bottom-0 -z-10 h-80 w-80 rounded-full bg-blue-100/30 blur-[100px] dark:bg-blue-900/10 lg:hidden" />
+                        </div>
                     </div>
                 </div>
             </div>
