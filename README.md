@@ -75,6 +75,9 @@ Before you begin, ensure you have the following installed:
 
 ## Installation
 
+# For local use scikit-learn>=1.6.0
+# For Server end scikit-learn==1.5.1
+
 ### Backend Setup
 
 1. Navigate to the backend directory:
