@@ -5,7 +5,7 @@ export const site = {
   description: "Advanced ovarian cancer prediction using AI and machine learning",
   url: site_url,
   ogImage: `${site_url}/og.jpg`,
-  logo: "/logo.svg",
+  logo: "/logo.png",
   mailSupport: "hello@domain.com", // Support email address
   mailFrom: process.env.MAIL_FROM || "noreply@domain.com", // Transactional email address
   links: {
