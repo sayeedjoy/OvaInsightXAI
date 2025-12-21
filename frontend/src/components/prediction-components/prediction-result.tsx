@@ -92,7 +92,7 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
     const IconComponent = predictionDisplay?.icon
 
     return (
-        <Card className="h-fit w-full lg:sticky lg:top-6 lg:shadow-lg">
+        <Card className="h-fit w-full lg:sticky lg:top-6">
             <CardHeader className="pb-4 sm:pb-6 lg:pb-6">
                 <CardTitle className="text-lg font-semibold sm:text-xl lg:text-xl">
                     Prediction Result
@@ -123,7 +123,7 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
                         {/* Prediction Status */}
                         <div className={`rounded-xl border-2 ${predictionDisplay.borderColor} ${predictionDisplay.bgColor} p-4 sm:p-5`}>
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-4">
-                                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background/80 shadow-sm sm:h-14 sm:w-14`}>
+                                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background/80 sm:h-14 sm:w-14`}>
                                     <IconComponent className={`h-6 w-6 sm:h-7 sm:w-7 ${predictionDisplay.iconColor}`} />
                                 </div>
                                 <div className="flex-1 space-y-3 min-w-0 lg:space-y-3">
