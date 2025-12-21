@@ -20,11 +20,37 @@ const nextConfig: NextConfig = {
                         key: "Content-Security-Policy",
                         value: [
                             "default-src 'self'",
-                            "connect-src 'self' https://api.sayeedjoy.com",
-                            "img-src 'self' data:",
+                            "connect-src 'self'",
+                            "img-src 'self' data: https:",
                             "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
                             "style-src 'self' 'unsafe-inline'"
                         ].join("; ")
+                    },
+                    {
+                        key: "Permissions-Policy",
+                        value: [
+                            "accelerometer=()",
+                            "autoplay=()",
+                            "camera=()",
+                            "cross-origin-isolated=()",
+                            "display-capture=()",
+                            "encrypted-media=()",
+                            "fullscreen=(self)",
+                            "geolocation=()",
+                            "gyroscope=()",
+                            "keyboard-map=()",
+                            "magnetometer=()",
+                            "microphone=()",
+                            "midi=()",
+                            "payment=()",
+                            "picture-in-picture=()",
+                            "publickey-credentials-get=()",
+                            "screen-wake-lock=()",
+                            "sync-xhr=()",
+                            "usb=()",
+                            "web-share=()",
+                            "xr-spatial-tracking=()"
+                        ].join(", ")
                     }
                 ]
             }
