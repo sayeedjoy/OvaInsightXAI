@@ -1,7 +1,7 @@
 const site_url = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export const site = {
-  name: "OvaInsightXAI",
+  name: "MultiDx Clinical AI",
   description: "Advanced ovarian cancer prediction using AI and machine learning",
   url: site_url,
   ogImage: `${site_url}/og.jpg`,

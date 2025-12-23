@@ -36,6 +36,10 @@ const routeList: RouteProps[] = [
         label: "Prediction Test"
     },
     {
+        href: "/pcos",
+        label: "PCOS Prediction"
+    },
+    {
         href: "#about",
         label: "About Us"
     },
