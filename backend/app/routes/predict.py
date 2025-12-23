@@ -143,15 +143,16 @@ async def predict_ovarian(payload: PredictionRequest) -> PredictionResponse:
 async def predict_hepatitis_b(payload: HepatitisBRequest) -> PredictionResponse:
     """Prediction endpoint for hepatitis B model."""
     config = MODEL_REGISTRY["hepatitis_b"]
-    # Use by_alias=False to work with field names defined in registry order
-    return _predict_with_model(payload.model_dump(), "hepatitis_b", config.feature_order)
+    # Use by_alias=True so payload keys match the CSV headers
+    return _predict_with_model(payload.model_dump(by_alias=True), "hepatitis_b", config.feature_order)
 
 
 @router.post("/predict/pcos", response_model=PredictionResponse)
 async def predict_pcos(payload: PcosRequest) -> PredictionResponse:
     """Prediction endpoint for PCOS model."""
     config = MODEL_REGISTRY["pcos"]
-    return _predict_with_model(payload.model_dump(), "pcos", config.feature_order)
+    # Use by_alias=True so the payload keys match the original CSV headers
+    return _predict_with_model(payload.model_dump(by_alias=True), "pcos", config.feature_order)
 
 
 @router.get("/health", response_model=HealthResponse)
