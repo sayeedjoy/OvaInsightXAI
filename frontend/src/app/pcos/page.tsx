@@ -143,7 +143,11 @@ export default function PcosPredictPage() {
                             onFillTestCase={handleFillTestCase}
                         />
                     </div>
-                    <PredictionResultCard result={result} error={error} />
+                    <PredictionResultCard
+                        result={result}
+                        error={error}
+                        conditionName="PCOS"
+                    />
                 </div>
             </div>
         </>

@@ -28,9 +28,14 @@ export type PredictionResult = {
 interface PredictionResultCardProps {
     result: PredictionResult | null
     error: string | null
+    conditionName?: string
 }
 
-export function PredictionResultCard({ result, error }: PredictionResultCardProps) {
+export function PredictionResultCard({
+    result,
+    error,
+    conditionName = "Ovarian Cancer"
+}: PredictionResultCardProps) {
     const getPredictionDisplay = (prediction: number | string) => {
         const predValue = typeof prediction === "string" 
             ? Number.parseFloat(prediction) 
@@ -48,11 +53,11 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
             }
         }
 
-        // Assuming 1 = cancer, 0 = no cancer
+        // Assuming 1 = positive, 0 = negative
         if (predValue === 1 || predValue > 0.5) {
             return {
-                label: "Possible Ovarian Cancer",
-                description: "The model indicates a potential risk of ovarian cancer. Please consult with a healthcare professional for further evaluation and diagnostic testing.",
+                label: `Possible ${conditionName}`,
+                description: `The model indicates a potential risk of ${conditionName.toLowerCase()}. Please consult with a healthcare professional for further evaluation and diagnostic testing.`,
                 variant: "destructive" as const,
                 icon: XCircle,
                 iconColor: "text-red-600 dark:text-red-500",
@@ -61,8 +66,8 @@ export function PredictionResultCard({ result, error }: PredictionResultCardProp
             }
         } else {
             return {
-                label: "No Ovarian Cancer",
-                description: "The model indicates no signs of ovarian cancer based on the provided biomarkers. However, regular check-ups and screenings are still recommended.",
+                label: `No ${conditionName}`,
+                description: `The model indicates no signs of ${conditionName.toLowerCase()} based on the provided biomarkers. However, regular check-ups and screenings are still recommended.`,
                 variant: "default" as const,
                 icon: CheckCircle2,
                 iconColor: "text-green-600 dark:text-green-500",
