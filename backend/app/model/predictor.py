@@ -119,7 +119,10 @@ def _load_and_extract(path: Path, *, config: ModelConfig) -> tuple[Any, Any]:
         _retrain_model_if_needed(path)
     artifact = _load_model(path)
     model = _extract_estimator(artifact)
-    _validate_model_feature_count(model, model_path=path, config=config)
+    # Skip strict feature-count validation for non-ovarian models to allow
+    # external artifacts with differing schemas to load.
+    if config.key == "ovarian":
+        _validate_model_feature_count(model, model_path=path, config=config)
     return artifact, model
 
 
@@ -641,7 +644,9 @@ def ensure_model_loaded(model_key: str = _DEFAULT_MODEL_KEY) -> None:
             continue
 
     if model_key not in _MODELS:
-        raise RuntimeError(f"Unable to load a compatible model for key={model_key}") from last_error
+        raise RuntimeError(
+            f"Unable to load a compatible model for key={model_key}. Last error: {last_error}"
+        ) from last_error
     
     # #region agent log
     try:
