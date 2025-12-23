@@ -42,6 +42,9 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
             "Bilirubin",
             "Alk_phosphate",
             "Sgot",
+            "Albumin",
+            "Protime",
+            "Histology",
         ],
     ),
     "pcos": ModelConfig(

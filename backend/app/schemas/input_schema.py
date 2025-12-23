@@ -54,6 +54,9 @@ class HepatitisBRequest(BaseModel):
     bilirubin: float = Field(..., alias="Bilirubin", description="Bilirubin level")
     alk_phosphate: float = Field(..., alias="Alk_phosphate", description="Alkaline phosphatase")
     sgot: float = Field(..., alias="Sgot", description="SGOT level")
+    albumin: float = Field(..., alias="Albumin", description="Serum albumin level")
+    protime: float = Field(..., alias="Protime", description="Prothrombin time")
+    histology: float = Field(..., alias="Histology", description="Histology indicator")
 
 
 class PcosRequest(BaseModel):
