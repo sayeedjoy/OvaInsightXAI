@@ -1,30 +1,19 @@
 FROM node:20-alpine AS base
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
-
 # Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY package.json ./
-# Copy lockfile if it exists (optional)
-COPY pnpm-lock.yaml* ./
+COPY package.json package-lock.json* ./
 
 # Install dependencies
-# Try frozen lockfile first, fallback to regular install if lockfile doesn't exist
-RUN if [ -f pnpm-lock.yaml ]; then \
-        pnpm install --frozen-lockfile || pnpm install; \
-    else \
-        echo "Warning: pnpm-lock.yaml not found, installing without lockfile"; \
-        pnpm install; \
-    fi
+RUN npm ci || npm install
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN pnpm build
+RUN npm run build
 
 # Production image
 FROM node:20-alpine AS runner
