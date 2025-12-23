@@ -2,6 +2,7 @@ import { Navbar } from "@/components/layout/navbar"
 import { FooterSection } from "@/components/layout/sections/footer"
 import type { Metadata } from "next"
 import { site } from "@/config/site"
+import "@/components/pcos-components/index.css"
 
 export const metadata: Metadata = {
     title: "PCOS Prediction",
@@ -45,11 +46,11 @@ export default function PcosLayout({
     children: React.ReactNode
 }) {
     return (
-        <>
+        <div style={{ fontFamily: "Inter, ui-sans-serif, sans-serif, system-ui" }}>
             <Navbar />
             {children}
             <FooterSection />
-        </>
+        </div>
     )
 }
 
