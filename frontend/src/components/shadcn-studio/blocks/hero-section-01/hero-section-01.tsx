@@ -7,10 +7,7 @@ const HeroSection = () => {
     <section className='flex min-h-[calc(100dvh-4rem)] flex-1 flex-col justify-between gap-12 overflow-x-hidden pt-8 sm:gap-16 sm:pt-16 lg:gap-24 lg:pt-24'>
       {/* Hero Content */}
       <div className='mx-auto flex max-w-7xl flex-col items-center gap-8 px-4 text-center sm:px-6 lg:px-8'>
-        <div className='bg-muted flex items-center gap-2.5 rounded-full border px-3 py-2'>
-          <Badge>AI-Powered</Badge>
-          <span className='text-muted-foreground'>Clinical prediction solution</span>
-        </div>
+        <Badge>AI-Powered</Badge>
 
         <h1 className='text-3xl leading-[1.29167] font-bold text-balance sm:text-4xl lg:text-5xl'>
           Advanced Medical
