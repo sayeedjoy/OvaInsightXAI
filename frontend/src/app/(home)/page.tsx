@@ -3,13 +3,14 @@ import { CommunitySection } from "@/components/layout/sections/community"
 import { ContactSection } from "@/components/layout/sections/contact"
 import { FAQSection } from "@/components/layout/sections/faq"
 import { FeaturesSection } from "@/components/layout/sections/features"
-import { HeroSection } from "@/components/layout/sections/hero"
+import HeroSection from "@/components/shadcn-studio/blocks/hero-section-01/hero-section-01"
 import { PricingSection } from "@/components/layout/sections/pricing"
 import { ServicesSection } from "@/components/layout/sections/services"
 import { TeamSection } from "@/components/layout/sections/team"
 import { TestimonialSection } from "@/components/layout/sections/testimonial"
 import LogoCloud from "@/components/logo-cloud"
 import { site } from "@/config/site"
+import { ModelSection } from "@/components/layout/sections/model"
 
 export const metadata = {
     title: "Home",
@@ -40,6 +41,7 @@ export default function Home() {
     return (
         <>
             <HeroSection />
+            <ModelSection />
             <FAQSection />
         </>
     )
