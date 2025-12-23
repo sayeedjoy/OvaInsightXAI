@@ -38,7 +38,7 @@ class HealthResponse(BaseModel):
 
 
 class HepatitisBRequest(BaseModel):
-    """Payload for the hepatitis B model."""
+    """Payload for the hepatitis B model (15 features, ordered to match training columns)."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 

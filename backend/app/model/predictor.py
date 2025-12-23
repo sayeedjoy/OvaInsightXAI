@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import pickle
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Iterable, NamedTuple, Sequence, Union
@@ -36,6 +37,7 @@ _MODELS: dict[str, Any] = {}
 _MODEL_ARTIFACTS: dict[str, Any] = {}
 _SUPPORTS_PROBA: dict[str, bool] = {}
 _LOADED_MODEL_PATHS: dict[str, Path] = {}
+_LAST_LOAD_ERRORS: dict[str, str | None] = {}
 
 
 def _get_config(model_key: str) -> ModelConfig:
@@ -83,8 +85,10 @@ def _validate_model_feature_count(model: Any, *, model_path: Path, config: Model
 
     if actual != expected:
         raise ValueError(
-            f"Loaded model expects {actual} features but API is configured for {expected}. "
-            f"Fix the model file or unset MODEL_PATH. Loaded from: {model_path}"
+            f"Loaded model expects {actual} features but API is configured for {expected} "
+            f"following feature order: {config.feature_order}. "
+            f"Fix the model artifact to match the API schema or update the configured feature order. "
+            f"Loaded from: {model_path}"
         )
 
 
@@ -119,9 +123,8 @@ def _load_and_extract(path: Path, *, config: ModelConfig) -> tuple[Any, Any]:
         _retrain_model_if_needed(path)
     artifact = _load_model(path)
     model = _extract_estimator(artifact)
-    # Skip strict feature-count validation for non-ovarian models to allow
-    # external artifacts with differing schemas to load.
-    if config.key == "ovarian":
+    # Validate feature-count for models where schema must align with API expectations.
+    if config.key in ("ovarian", "hepatitis_b"):
         _validate_model_feature_count(model, model_path=path, config=config)
     return artifact, model
 
@@ -139,6 +142,7 @@ def get_model_info(model_key: str = _DEFAULT_MODEL_KEY) -> dict[str, Any]:
     artifact = _MODEL_ARTIFACTS.get(model_key)
     model = _MODELS.get(model_key)
     loaded_path = _LOADED_MODEL_PATHS.get(model_key)
+    actual = _get_model_feature_count(model) if model is not None else None
 
     # Get model data version from artifact if available
     model_data_version = None
@@ -152,15 +156,43 @@ def get_model_info(model_key: str = _DEFAULT_MODEL_KEY) -> dict[str, Any]:
         "configured_model_path": str(primary_path),
         "configured_model_path_exists": primary_path.exists(),
         "expected_feature_count": expected,
+        "expected_feature_order": config.feature_order,
         "loaded_model_path": str(loaded_path) if loaded_path else None,
         "loaded_model_type": type(model).__name__ if model is not None else None,
-        "loaded_model_feature_count": _get_model_feature_count(model) if model is not None else None,
+        "loaded_model_feature_count": actual,
+        "feature_count_match": (actual == expected) if actual is not None else None,
+        "last_load_error": _LAST_LOAD_ERRORS.get(model_key),
         "candidate_paths": [str(p) for p in _candidate_model_paths(primary_path, config)],
         "current_model_data_version": MODEL_DATA_VERSION,
         "loaded_model_data_version": model_data_version,
         "loaded_model_sklearn_version": model_sklearn_version,
     }
     return info
+
+
+def feature_self_check(model_key: str) -> dict[str, Any]:
+    """
+    Lightweight guardrail to verify a model can be loaded and its feature
+    count matches the configured schema. Useful for operational diagnostics
+    and quick unit/integration checks.
+    """
+    try:
+        ensure_model_loaded(model_key)
+    except Exception as exc:  # noqa: BLE001 - propagate details to caller
+        return {
+            "ok": False,
+            "error": str(exc),
+            "model_key": model_key,
+        }
+
+    info = get_model_info(model_key)
+    return {
+        "ok": info.get("feature_count_match") is True,
+        "model_key": model_key,
+        "expected_feature_count": info.get("expected_feature_count"),
+        "loaded_model_feature_count": info.get("loaded_model_feature_count"),
+        "last_load_error": info.get("last_load_error"),
+    }
 
 
 class PredictionResult(NamedTuple):
@@ -201,6 +233,21 @@ def _load_model(path: Path):
 
     if joblib:
         logger.info("Loading model via joblib from %s", path)
+
+        # Compatibility shim: some externally trained artifacts reference classes
+        # defined in __main__ (e.g., DeployableModel). Provide a lightweight stub
+        # so unpickling succeeds even if the original training script is absent.
+        class _ShimDeployableModel:  # noqa: D401 - simple compatibility shim
+            """Compatibility shim for unpickling unknown DeployableModel."""
+
+            def __init__(self, *args, **kwargs):
+                self.args = args
+                self.kwargs = kwargs
+
+        main_module = sys.modules.get("__main__")
+        if main_module and not hasattr(main_module, "DeployableModel"):
+            setattr(main_module, "DeployableModel", _ShimDeployableModel)
+
         try:
             artifact = joblib.load(path)
             # #region agent log
@@ -320,6 +367,10 @@ def _extract_estimator(artifact: Any):
         return artifact
 
     if isinstance(artifact, Mapping):
+        # Log available keys for debugging
+        available_keys = list(artifact.keys())
+        logger.debug("Artifact is a mapping with keys: %s", available_keys)
+        
         # First check for new format with "pipeline" key (from retrain_model.py)
         if "pipeline" in artifact:
             pipeline = artifact["pipeline"]
@@ -328,21 +379,35 @@ def _extract_estimator(artifact: Any):
                           artifact.get("sklearn_version", "unknown"))
                 return pipeline
         
-        # Fallback to old format keys
+        # Check for common sklearn pipeline/estimator keys
         candidate_keys = (
             "model",
             "estimator",
             "classifier",
             "meta_logreg",
+            "pipeline",
+            "sklearn_pipeline",
+            "clf",
+            "classifier_model",
         )
         for key in candidate_keys:
             value = artifact.get(key)
             if value is not None and hasattr(value, "predict"):
                 logger.info("Extracted estimator from artifact key '%s'.", key)
                 return value
+        
+        # Try to find any value in the dict that has a predict method
+        for key, value in artifact.items():
+            if hasattr(value, "predict") and not isinstance(value, (str, int, float, bool, type(None))):
+                logger.info("Extracted estimator from artifact key '%s' (auto-detected).", key)
+                return value
+        
+        # If we still haven't found it, provide detailed error with available keys
         raise ValueError(
-            "Loaded model artifact is a mapping but none of the expected keys "
-            "('pipeline', 'model', 'estimator', 'classifier', 'meta_logreg') contain a valid estimator."
+            f"Loaded model artifact is a mapping but none of the expected keys "
+            f"('pipeline', 'model', 'estimator', 'classifier', 'meta_logreg') contain a valid estimator. "
+            f"Available keys in artifact: {available_keys}. "
+            f"Please check the model file structure or update _extract_estimator to handle this format."
         )
 
     raise TypeError(
@@ -619,6 +684,7 @@ def ensure_model_loaded(model_key: str = _DEFAULT_MODEL_KEY) -> None:
     
     strict = os.getenv("STRICT_MODEL_FEATURES", "0") == "1"
     last_error: Exception | None = None
+    _LAST_LOAD_ERRORS[model_key] = None
     for candidate in _candidate_model_paths(primary_path, config):
         try:
             artifact, model = _load_and_extract(candidate, config=config)
@@ -637,6 +703,7 @@ def ensure_model_loaded(model_key: str = _DEFAULT_MODEL_KEY) -> None:
             break
         except Exception as exc:
             last_error = exc
+            _LAST_LOAD_ERRORS[model_key] = str(exc)
             if strict:
                 # Fail fast in strict mode (useful for production to avoid silent fallbacks).
                 raise
@@ -644,6 +711,8 @@ def ensure_model_loaded(model_key: str = _DEFAULT_MODEL_KEY) -> None:
             continue
 
     if model_key not in _MODELS:
+        if model_key not in _LAST_LOAD_ERRORS:
+            _LAST_LOAD_ERRORS[model_key] = str(last_error) if last_error else "Unknown load error"
         raise RuntimeError(
             f"Unable to load a compatible model for key={model_key}. Last error: {last_error}"
         ) from last_error

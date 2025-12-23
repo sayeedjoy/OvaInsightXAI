@@ -29,6 +29,7 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
     "hepatitis_b": ModelConfig(
         key="hepatitis_b",
         path=MODEL_DIR / "Hepatitis_B.pkl",
+        # Column order must match the training CSV and HepatitisBRequest aliases.
         feature_order=[
             "Age",
             "Sex",
