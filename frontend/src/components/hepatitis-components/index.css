@@ -1,16 +1,16 @@
 /**
- * PCOS Components Styles
+ * Hepatitis Components Styles
  * 
  * Uses the main color system from globals.css
  * All color variables are available via CSS custom properties
  */
 
-/* PCOS-specific component styles can be added here */
+/* Hepatitis-specific component styles can be added here */
 /* Currently using the main theme colors from globals.css */
 
-/* Example: If you need PCOS-specific overrides, add them below */
+/* Example: If you need Hepatitis-specific overrides, add them below */
 /* 
-.pcos-form-container {
+.hepatitis-form-container {
   background-color: var(--color-card);
   color: var(--color-card-foreground);
 }
