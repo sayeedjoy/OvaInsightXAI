@@ -61,7 +61,7 @@ export const Navbar = () => {
                                 height={30}
                             />
                         </div>
-                        <h3 className="font-bold text-xl lg:text-2xl">
+                        <h3 className="font-bold text-sm lg:text-base">
                             {site.name}
                         </h3>
                     </Link>

@@ -61,13 +61,20 @@ const Features = ({
                 <h6 className='mb-2 text-lg font-semibold'>{features.title}</h6>
                 <p className='text-muted-foreground mb-4 flex-1'>{features.description}</p>
                 {features.href && (
-                  <Link 
-                    href={features.href} 
-                    className='inline-flex items-center gap-1 text-sm font-medium underline decoration-dotted underline-offset-4 hover:opacity-80 transition-opacity mt-auto'
+                  <Button 
+                    variant='outline' 
+                    size='sm'
+                    className='w-fit mt-auto bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black border-yellow-400'
+                    asChild
                   >
-                    Visit page
-                    <ArrowUpRightIcon className='size-4' />
-                  </Link>
+                    <Link 
+                      href={features.href} 
+                      className='inline-flex items-center gap-2 group'
+                    >
+                      Visit page
+                      <ArrowUpRightIcon className='size-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform' />
+                    </Link>
+                  </Button>
                 )}
               </CardContent>
             </Card>
