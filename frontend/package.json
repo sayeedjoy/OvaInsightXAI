@@ -5,6 +5,7 @@
     "scripts": {
         "dev": "next dev --turbopack",
         "build": "next build",
+        "build:windows": "powershell -ExecutionPolicy Bypass -File ./build-windows.ps1",
         "start": "next start",
         "lint": "biome check",
         "check-types": "tsc --noEmit"
@@ -56,7 +57,7 @@
         "@types/react": "^19.1.8",
         "@types/react-dom": "^19.1.6",
         "dotenv": "^16.5.0",
-        "drizzle-kit": "^0.31.1",
+        "drizzle-kit": "^0.18.1",
         "esbuild": "^0.25.5",
         "tailwindcss": "^4.1.10",
         "tailwindcss-safe-area": "^0.6.0",
