@@ -32,14 +32,6 @@ const routeList: RouteProps[] = [
         label: "Home"
     },
     {
-        href: "/predict",
-        label: "Prediction Test"
-    },
-    {
-        href: "/pcos",
-        label: "PCOS Prediction"
-    },
-    {
         href: "#about",
         label: "About Us"
     },
