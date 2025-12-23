@@ -9,7 +9,14 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, status
 
 from app.model import predictor
-from app.schemas.input_schema import HealthResponse, PredictionRequest, PredictionResponse
+from app.model.registry import MODEL_REGISTRY
+from app.schemas.input_schema import (
+    HealthResponse,
+    HepatitisBRequest,
+    PcosRequest,
+    PredictionRequest,
+    PredictionResponse,
+)
 from app.services.preprocessing import request_to_features
 from app.utils.config import FeatureOrderError
 
@@ -42,81 +49,82 @@ except ImportError:
 router = APIRouter(tags=["prediction"])
 
 
+def _predict_with_model(payload, model_key: str, feature_order: list[str]) -> PredictionResponse:
+    """Shared prediction handler across models."""
+    try:
+        features = request_to_features(payload, feature_order)
+    except FeatureOrderError as exc:
+        logger.warning("Invalid feature payload for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        logger.error("Unexpected error during feature preprocessing for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Feature preprocessing failed: {str(exc)}"
+        )
+
+    try:
+        predictor.ensure_model_loaded(model_key)
+    except FileNotFoundError as exc:
+        logger.error("Model file missing for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Model file not found: {str(exc)}"
+        )
+    except Exception as exc:
+        logger.error("Error loading model %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to load model: {str(exc)}"
+        )
+
+    try:
+        result = predictor.predict(features, model_key=model_key)
+    except FileNotFoundError as exc:
+        logger.error("Model file missing during prediction for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Model file not found: {str(exc)}"
+        )
+    except RuntimeError as exc:
+        logger.error("Model not loaded for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Model not loaded: {str(exc)}"
+        )
+    except ValueError as exc:
+        logger.error("Model inference failed for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Model inference error: {str(exc)}"
+        )
+    except Exception as exc:
+        logger.error("Unexpected error during prediction for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Prediction failed: {str(exc)}"
+        )
+
+    try:
+        return PredictionResponse(prediction=result.prediction, confidence=result.confidence)
+    except Exception as exc:
+        logger.error("Error creating response for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create response: {str(exc)}"
+        )
+
+
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_endpoint(payload: PredictionRequest) -> PredictionResponse:
-    """Validate input, run inference, and return the model output."""
+    """Validate input, run inference, and return the ovarian model output."""
+    config = MODEL_REGISTRY["ovarian"]
     try:
-        # Convert request to features
-        try:
-            features = request_to_features(payload)
-        except FeatureOrderError as exc:
-            logger.warning("Invalid feature payload: %s", exc, exc_info=True)
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-        except Exception as exc:
-            logger.error("Unexpected error during feature preprocessing: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Feature preprocessing failed: {str(exc)}"
-            )
-
-        # Ensure model is loaded before prediction
-        try:
-            predictor.ensure_model_loaded()
-        except FileNotFoundError as exc:
-            logger.error("Model file missing: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Model file not found: {str(exc)}"
-            )
-        except Exception as exc:
-            logger.error("Error loading model: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Failed to load model: {str(exc)}"
-            )
-
-        # Run prediction
-        try:
-            result = predictor.predict(features)
-        except FileNotFoundError as exc:
-            logger.error("Model file missing: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Model file not found: {str(exc)}"
-            )
-        except RuntimeError as exc:
-            logger.error("Model not loaded: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Model not loaded: {str(exc)}"
-            )
-        except ValueError as exc:
-            logger.error("Model inference failed: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Model inference error: {str(exc)}"
-            )
-        except Exception as exc:
-            logger.error("Unexpected error during prediction: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Prediction failed: {str(exc)}"
-            )
-
-        # Return response
-        try:
-            return PredictionResponse(prediction=result.prediction, confidence=result.confidence)
-        except Exception as exc:
-            logger.error("Error creating response: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to create response: {str(exc)}"
-            )
+        data = payload.model_dump()
+        return _predict_with_model(data, "ovarian", config.feature_order)
     except HTTPException:
-        # Re-raise HTTPExceptions as-is
         raise
     except Exception as exc:
-        # Catch-all for any other unexpected exceptions
         logger.error("Unexpected error in predict endpoint: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -124,11 +132,33 @@ async def predict_endpoint(payload: PredictionRequest) -> PredictionResponse:
         )
 
 
+@router.post("/predict/ovarian", response_model=PredictionResponse)
+async def predict_ovarian(payload: PredictionRequest) -> PredictionResponse:
+    """Prediction endpoint for ovarian model (alias of /predict)."""
+    config = MODEL_REGISTRY["ovarian"]
+    return _predict_with_model(payload.model_dump(), "ovarian", config.feature_order)
+
+
+@router.post("/predict/hepatitis_b", response_model=PredictionResponse)
+async def predict_hepatitis_b(payload: HepatitisBRequest) -> PredictionResponse:
+    """Prediction endpoint for hepatitis B model."""
+    config = MODEL_REGISTRY["hepatitis_b"]
+    # Use by_alias=False to work with field names defined in registry order
+    return _predict_with_model(payload.model_dump(), "hepatitis_b", config.feature_order)
+
+
+@router.post("/predict/pcos", response_model=PredictionResponse)
+async def predict_pcos(payload: PcosRequest) -> PredictionResponse:
+    """Prediction endpoint for PCOS model."""
+    config = MODEL_REGISTRY["pcos"]
+    return _predict_with_model(payload.model_dump(), "pcos", config.feature_order)
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     """Lightweight readiness probe."""
     try:
-        predictor.ensure_model_loaded()
+        predictor.ensure_model_loaded("ovarian")
     except FileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -144,16 +174,19 @@ async def health() -> HealthResponse:
 
 
 @router.get("/model-info")
-async def model_info() -> dict:
+async def model_info(model: str | None = None) -> dict:
     """
     Operational debug endpoint: shows which model path is used and feature counts.
     """
+    model_key = model or "ovarian"
+    if model_key not in MODEL_REGISTRY:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown model: {model_key}")
     try:
-        predictor.ensure_model_loaded()
+        predictor.ensure_model_loaded(model_key)
     except Exception:
         # Still return useful info even if model didn't load
-        return predictor.get_model_info()
-    return predictor.get_model_info()
+        return predictor.get_model_info(model_key)
+    return predictor.get_model_info(model_key)
 
 
 @router.get("/test-case/negative")

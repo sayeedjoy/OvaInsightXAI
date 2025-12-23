@@ -8,11 +8,12 @@ import os
 import pickle
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, NamedTuple, Sequence, Union
+from typing import Any, Iterable, NamedTuple, Sequence, Union
 
 import numpy as np
 
-from app.utils.config import FEATURE_ORDER, MODEL_PATH, validate_feature_iterable
+from app.model.registry import MODEL_REGISTRY, ModelConfig
+from app.utils.config import MODEL_PATH, validate_feature_iterable
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +29,30 @@ DEBUG_LOG_PATH = _workspace_log if _workspace_log.parent.exists() else (_docker_
 DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 # #endregion
 
-_MODEL = None
-_MODEL_ARTIFACT: Any = None
-_SUPPORTS_PROBA = False
-_LOADED_MODEL_PATH: Path | None = None
+_DEFAULT_MODEL_KEY = "ovarian"
+
+# Per-model caches
+_MODELS: dict[str, Any] = {}
+_MODEL_ARTIFACTS: dict[str, Any] = {}
+_SUPPORTS_PROBA: dict[str, bool] = {}
+_LOADED_MODEL_PATHS: dict[str, Path] = {}
 
 
-def _expected_feature_count() -> int:
-    return len(FEATURE_ORDER)
+def _get_config(model_key: str) -> ModelConfig:
+    if model_key not in MODEL_REGISTRY:
+        raise KeyError(f"Unknown model key: {model_key}")
+    return MODEL_REGISTRY[model_key]
+
+
+def _resolve_primary_path(config: ModelConfig) -> Path:
+    # Preserve existing env override for ovarian model only
+    if config.key == "ovarian":
+        return MODEL_PATH
+    return config.path
+
+
+def _expected_feature_count(config: ModelConfig) -> int:
+    return len(config.feature_order)
 
 
 def _get_model_feature_count(model: Any) -> int | None:
@@ -53,8 +70,8 @@ def _get_model_feature_count(model: Any) -> int | None:
         return None
 
 
-def _validate_model_feature_count(model: Any, *, model_path: Path) -> None:
-    expected = _expected_feature_count()
+def _validate_model_feature_count(model: Any, *, model_path: Path, config: ModelConfig) -> None:
+    expected = _expected_feature_count(config)
     actual = _get_model_feature_count(model)
     if actual is None:
         logger.warning(
@@ -71,7 +88,7 @@ def _validate_model_feature_count(model: Any, *, model_path: Path) -> None:
         )
 
 
-def _candidate_model_paths(primary: Path) -> list[Path]:
+def _candidate_model_paths(primary: Path, config: ModelConfig) -> list[Path]:
     """
     Return a list of paths to try, in order.
 
@@ -88,43 +105,54 @@ def _candidate_model_paths(primary: Path) -> list[Path]:
 
     in_docker = Path("/app").exists()
     if in_docker:
-        add(Path("/app/app/model/model.pkl"))
-        add(Path("/opt/models/model.pkl"))
+        # Keep backwards-compatible docker fallbacks for ovarian only
+        if config.key == "ovarian":
+            add(Path("/app/app/model/model.pkl"))
+            add(Path("/opt/models/model.pkl"))
 
     return candidates
 
 
-def _load_and_extract(path: Path) -> tuple[Any, Any]:
+def _load_and_extract(path: Path, *, config: ModelConfig) -> tuple[Any, Any]:
     """Load artifact from path and extract estimator/pipeline."""
-    _retrain_model_if_needed(path)
+    if config.key == "ovarian":
+        _retrain_model_if_needed(path)
     artifact = _load_model(path)
     model = _extract_estimator(artifact)
+    _validate_model_feature_count(model, model_path=path, config=config)
     return artifact, model
 
 
-def get_model_info() -> dict[str, Any]:
+def get_model_info(model_key: str = _DEFAULT_MODEL_KEY) -> dict[str, Any]:
     """
     Return debug information about the model selection and feature expectations.
 
     Intended for operational debugging (e.g., verifying VPS loads the correct model).
     """
-    expected = _expected_feature_count()
+    config = _get_config(model_key)
+    primary_path = _resolve_primary_path(config)
+    expected = _expected_feature_count(config)
     
+    artifact = _MODEL_ARTIFACTS.get(model_key)
+    model = _MODELS.get(model_key)
+    loaded_path = _LOADED_MODEL_PATHS.get(model_key)
+
     # Get model data version from artifact if available
     model_data_version = None
     model_sklearn_version = None
-    if isinstance(_MODEL_ARTIFACT, Mapping):
-        model_data_version = _MODEL_ARTIFACT.get("model_data_version", "unknown")
-        model_sklearn_version = _MODEL_ARTIFACT.get("sklearn_version", "unknown")
+    if isinstance(artifact, Mapping):
+        model_data_version = artifact.get("model_data_version", "unknown")
+        model_sklearn_version = artifact.get("sklearn_version", "unknown")
     
     info: dict[str, Any] = {
-        "configured_model_path": str(MODEL_PATH),
-        "configured_model_path_exists": MODEL_PATH.exists(),
+        "model_key": model_key,
+        "configured_model_path": str(primary_path),
+        "configured_model_path_exists": primary_path.exists(),
         "expected_feature_count": expected,
-        "loaded_model_path": str(_LOADED_MODEL_PATH) if _LOADED_MODEL_PATH else None,
-        "loaded_model_type": type(_MODEL).__name__ if _MODEL is not None else None,
-        "loaded_model_feature_count": _get_model_feature_count(_MODEL) if _MODEL is not None else None,
-        "candidate_paths": [str(p) for p in _candidate_model_paths(MODEL_PATH)],
+        "loaded_model_path": str(loaded_path) if loaded_path else None,
+        "loaded_model_type": type(model).__name__ if model is not None else None,
+        "loaded_model_feature_count": _get_model_feature_count(model) if model is not None else None,
+        "candidate_paths": [str(p) for p in _candidate_model_paths(primary_path, config)],
         "current_model_data_version": MODEL_DATA_VERSION,
         "loaded_model_data_version": model_data_version,
         "loaded_model_sklearn_version": model_sklearn_version,
@@ -563,42 +591,45 @@ def _retrain_model_if_needed(model_path: Path) -> bool:
     return False
 
 
-def ensure_model_loaded() -> None:
+def ensure_model_loaded(model_key: str = _DEFAULT_MODEL_KEY) -> None:
     """Load the model into memory if it has not been loaded yet."""
-    global _MODEL, _MODEL_ARTIFACT, _SUPPORTS_PROBA, _LOADED_MODEL_PATH
-    if _MODEL is not None:
+    if model_key in _MODELS:
         return
 
+    config = _get_config(model_key)
+    primary_path = _resolve_primary_path(config)
+
     # Log detailed path information for debugging
-    logger.info("Attempting to load model from: %s", MODEL_PATH)
-    logger.info("Model path exists: %s", MODEL_PATH.exists())
-    if MODEL_PATH.exists():
-        logger.info("Model file size: %s bytes", MODEL_PATH.stat().st_size)
-        logger.info("Model file permissions: %s", oct(MODEL_PATH.stat().st_mode))
+    logger.info("Attempting to load model '%s' from: %s", model_key, primary_path)
+    logger.info("Model path exists: %s", primary_path.exists())
+    if primary_path.exists():
+        logger.info("Model file size: %s bytes", primary_path.stat().st_size)
+        logger.info("Model file permissions: %s", oct(primary_path.stat().st_mode))
     
     # #region agent log
     try:
         with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "predictor.py:ensure_model_loaded", "message": "Model loading start", "data": {"model_path": str(MODEL_PATH), "path_exists": MODEL_PATH.exists(), "path_absolute": str(MODEL_PATH.resolve()), "file_size": MODEL_PATH.stat().st_size if MODEL_PATH.exists() else 0, "env_model_path": os.getenv("MODEL_PATH", "not_set")}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-    except: pass
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "predictor.py:ensure_model_loaded", "message": "Model loading start", "data": {"model_key": model_key, "model_path": str(primary_path), "path_exists": primary_path.exists(), "path_absolute": str(primary_path.resolve()), "file_size": primary_path.stat().st_size if primary_path.exists() else 0, "env_model_path": os.getenv("MODEL_PATH", "not_set")}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except:  # pragma: no cover - debug logging only
+        pass
     # #endregion
     
     strict = os.getenv("STRICT_MODEL_FEATURES", "0") == "1"
     last_error: Exception | None = None
-    for candidate in _candidate_model_paths(MODEL_PATH):
+    for candidate in _candidate_model_paths(primary_path, config):
         try:
-            artifact, model = _load_and_extract(candidate)
-            _validate_model_feature_count(model, model_path=candidate)
+            artifact, model = _load_and_extract(candidate, config=config)
 
-            _MODEL_ARTIFACT = artifact
-            _MODEL = model
-            _SUPPORTS_PROBA = hasattr(_MODEL, "predict_proba")
-            _LOADED_MODEL_PATH = candidate
-            if candidate != MODEL_PATH:
+            _MODEL_ARTIFACTS[model_key] = artifact
+            _MODELS[model_key] = model
+            _SUPPORTS_PROBA[model_key] = hasattr(model, "predict_proba")
+            _LOADED_MODEL_PATHS[model_key] = candidate
+            if candidate != primary_path:
                 logger.warning(
-                    "Using fallback model path %s instead of configured MODEL_PATH=%s",
+                    "Using fallback model path %s instead of configured path=%s for key=%s",
                     candidate,
-                    MODEL_PATH,
+                    primary_path,
+                    model_key,
                 )
             break
         except Exception as exc:
@@ -606,44 +637,48 @@ def ensure_model_loaded() -> None:
             if strict:
                 # Fail fast in strict mode (useful for production to avoid silent fallbacks).
                 raise
-            logger.warning("Model load failed for %s: %s", candidate, exc)
+            logger.warning("Model load failed for %s (%s): %s", model_key, candidate, exc)
             continue
 
-    if _MODEL is None:
-        raise RuntimeError("Unable to load a compatible model") from last_error
+    if model_key not in _MODELS:
+        raise RuntimeError(f"Unable to load a compatible model for key={model_key}") from last_error
     
     # #region agent log
     try:
         import sklearn
         runtime_sklearn = sklearn.__version__
-    except:
+    except Exception:
         runtime_sklearn = "unknown"
     try:
         model_sklearn = "unknown"
-        if isinstance(_MODEL_ARTIFACT, Mapping) and "sklearn_version" in _MODEL_ARTIFACT:
-            model_sklearn = _MODEL_ARTIFACT.get("sklearn_version", "unknown")
+        artifact = _MODEL_ARTIFACTS.get(model_key)
+        if isinstance(artifact, Mapping) and "sklearn_version" in artifact:
+            model_sklearn = artifact.get("sklearn_version", "unknown")
         with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "predictor.py:ensure_model_loaded:after_load", "message": "Model loaded successfully", "data": {"model_type": type(_MODEL).__name__, "supports_proba": _SUPPORTS_PROBA, "model_sklearn_version": model_sklearn, "runtime_sklearn_version": runtime_sklearn, "versions_match": model_sklearn == runtime_sklearn}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-    except: pass
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "predictor.py:ensure_model_loaded:after_load", "message": "Model loaded successfully", "data": {"model_key": model_key, "model_type": type(_MODELS[model_key]).__name__, "supports_proba": _SUPPORTS_PROBA[model_key], "model_sklearn_version": model_sklearn, "runtime_sklearn_version": runtime_sklearn, "versions_match": model_sklearn == runtime_sklearn}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except Exception:  # pragma: no cover - debug logging only
+        pass
     # #endregion
     
     logger.info(
-        "Model loaded successfully (%s). Supports predict_proba=%s",
-        type(_MODEL).__name__,
-        _SUPPORTS_PROBA,
+        "Model '%s' loaded successfully (%s). Supports predict_proba=%s",
+        model_key,
+        type(_MODELS[model_key]).__name__,
+        _SUPPORTS_PROBA[model_key],
     )
 
 
-def predict(features: Sequence[float]) -> PredictionResult:
+def predict(features: Sequence[float], *, model_key: str = _DEFAULT_MODEL_KEY) -> PredictionResult:
     """Run inference on a single vector of features."""
-    if _MODEL is None:
+    if model_key not in _MODELS:
         raise RuntimeError("Model has not been loaded yet. Call ensure_model_loaded().")
 
+    config = _get_config(model_key)
     vector = validate_feature_iterable(features)
     
     # Log input features for debugging
-    logger.debug("Input features: %s", vector)
-    logger.debug("Feature count: %d (expected: %d)", len(vector), _expected_feature_count())
+    logger.debug("Input features (%s): %s", model_key, vector)
+    logger.debug("Feature count: %d (expected: %d)", len(vector), _expected_feature_count(config))
     
     # Convert to numpy array with proper shape: (n_samples, n_features)
     # Most sklearn-style estimators expect a 2D array: (n_samples, n_features)
@@ -658,25 +693,27 @@ def predict(features: Sequence[float]) -> PredictionResult:
     try:
         import sklearn
         runtime_sklearn = sklearn.__version__
-    except:
+    except Exception:
         runtime_sklearn = "unknown"
     try:
         with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:before_predict", "message": "Before prediction", "data": {"model_type": str(type(_MODEL)), "runtime_sklearn": runtime_sklearn, "batch_shape": list(batch.shape), "supports_proba": _SUPPORTS_PROBA}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-    except: pass
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:before_predict", "message": "Before prediction", "data": {"model_key": model_key, "model_type": str(type(_MODELS[model_key])), "runtime_sklearn": runtime_sklearn, "batch_shape": list(batch.shape), "supports_proba": _SUPPORTS_PROBA[model_key]}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+    except Exception:  # pragma: no cover - debug logging only
+        pass
     # #endregion
     
     # Run prediction with comprehensive error handling
     try:
         logger.debug("Calling model.predict() with batch shape: %s", batch.shape)
-        raw_prediction = _MODEL.predict(batch)[0]
+        raw_prediction = _MODELS[model_key].predict(batch)[0]
         logger.debug("Raw prediction result: %s (type: %s)", raw_prediction, type(raw_prediction))
     except (AttributeError, TypeError) as exc:
         # #region agent log
         try:
             with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:prediction_error", "message": "Prediction error caught", "data": {"error_type": type(exc).__name__, "error_message": str(exc), "has_fill_dtype": "_fill_dtype" in str(exc), "has_no_attribute": "has no attribute" in str(exc), "runtime_sklearn": runtime_sklearn}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-        except: pass
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:prediction_error", "message": "Prediction error caught", "data": {"model_key": model_key, "error_type": type(exc).__name__, "error_message": str(exc), "has_fill_dtype": "_fill_dtype" in str(exc), "has_no_attribute": "has no attribute" in str(exc), "runtime_sklearn": runtime_sklearn}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+        except Exception:  # pragma: no cover - debug logging only
+            pass
         # #endregion
         if "_fill_dtype" in str(exc) or "has no attribute" in str(exc):
             logger.error("Model prediction failed due to sklearn version mismatch: %s", exc, exc_info=True)
@@ -693,15 +730,15 @@ def predict(features: Sequence[float]) -> PredictionResult:
         raise
     except Exception as exc:
         logger.error("Unexpected error during model prediction: %s", exc, exc_info=True)
-        logger.error("Model type: %s, Batch shape: %s, Batch dtype: %s", type(_MODEL).__name__, batch.shape, batch.dtype)
+        logger.error("Model type: %s, Batch shape: %s, Batch dtype: %s", type(_MODELS[model_key]).__name__, batch.shape, batch.dtype)
         raise ValueError(f"Model prediction failed: {str(exc)}") from exc
     
     confidence = None
 
-    if _SUPPORTS_PROBA:
+    if _SUPPORTS_PROBA.get(model_key):
         try:
             logger.debug("Calling model.predict_proba() with batch shape: %s", batch.shape)
-            proba = _MODEL.predict_proba(batch)[0]
+            proba = _MODELS[model_key].predict_proba(batch)[0]
             confidence = float(max(proba))
             logger.debug("Prediction probabilities: %s, confidence: %s", proba, confidence)
         except (AttributeError, TypeError) as exc:
@@ -710,30 +747,31 @@ def predict(features: Sequence[float]) -> PredictionResult:
         except Exception as exc:
             logger.warning("Unexpected error during predict_proba: %s", exc, exc_info=True)
             # Continue without confidence if predict_proba fails
-
+    
     # Cast numpy scalars to native Python types for JSON serialization.
     prediction_value: Union[int, float] = (
         raw_prediction.item() if hasattr(raw_prediction, "item") else raw_prediction
     )
     
-    logger.info("Prediction completed: prediction=%s, confidence=%s", prediction_value, confidence)
+    logger.info("Prediction completed for %s: prediction=%s, confidence=%s", model_key, prediction_value, confidence)
 
     return PredictionResult(prediction=prediction_value, confidence=confidence)
 
 
-def warmup() -> None:
-    """Convenience hook to load the model during app startup."""
-    try:
-        ensure_model_loaded()
-    except FileNotFoundError as exc:
-        # Log loudly but allow the app to keep starting so health checks reveal the issue.
-        logger.error("Unable to warm up model: %s", exc)
-        logger.warning("Model file missing. Health check will report this issue.")
-        # Don't raise - let the app start so we can see the error via health check
-        # The app will start but prediction endpoints will fail
-    except Exception as exc:
-        # Log any other errors but don't crash the app
-        logger.error("Error during model warmup: %s", exc, exc_info=True)
-        logger.warning("Application will start but model may not be available")
+def warmup(model_keys: Iterable[str] | None = None) -> None:
+    """Convenience hook to load the model(s) during app startup."""
+    keys = list(model_keys) if model_keys is not None else list(MODEL_REGISTRY.keys())
+    for key in keys:
+        try:
+            ensure_model_loaded(key)
+        except FileNotFoundError as exc:
+            # Log loudly but allow the app to keep starting so health checks reveal the issue.
+            logger.error("Unable to warm up model '%s': %s", key, exc)
+            logger.warning("Model file missing for '%s'. Health check will report this issue.", key)
+            # Don't raise - let the app start so we can see the error via health check
+        except Exception as exc:
+            # Log any other errors but don't crash the app
+            logger.error("Error during model warmup for '%s': %s", key, exc, exc_info=True)
+            logger.warning("Application will start but model '%s' may not be available", key)
 
 

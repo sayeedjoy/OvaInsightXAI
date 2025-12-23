@@ -105,14 +105,15 @@ class FeatureOrderError(ValueError):
     """Raised when the incoming payload is missing required features."""
 
 
-def ordered_feature_vector(payload: Mapping[str, float]) -> list[float]:
-    """Return the model-ready feature vector following FEATURE_ORDER."""
-    missing: list[str] = [key for key in FEATURE_ORDER if key not in payload]
+def ordered_feature_vector(payload: Mapping[str, float], feature_order: list[str] | None = None) -> list[float]:
+    """Return the model-ready feature vector following the supplied order (defaults to FEATURE_ORDER)."""
+    order = feature_order or FEATURE_ORDER
+    missing: list[str] = [key for key in order if key not in payload]
     if missing:
         raise FeatureOrderError(
             f"Missing feature(s) required for inference: {', '.join(missing)}"
         )
-    return [float(payload[key]) for key in FEATURE_ORDER]
+    return [float(payload[key]) for key in order]
 
 
 def validate_feature_iterable(values: Iterable[float]) -> list[float]:
