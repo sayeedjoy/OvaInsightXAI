@@ -7,8 +7,104 @@ import { FaGithub } from "react-icons/fa";
 
 export default function Hero() {
   return (
-    <div className="min-h-screen lg:min-h-0 flex items-start justify-center pt-8 lg:pt-20 pb-0">
-      <div className="max-w-(--breakpoint-xl) w-full mx-auto grid grid-cols-1 lg:grid-cols-2 items-start gap-8 lg:gap-12 px-4 sm:px-6 pt-6 lg:pt-0 pb-0">
+    <div className="min-h-screen lg:min-h-0 flex items-start justify-center pt-8 lg:pt-20 pb-0 relative w-full">
+      {/* Dashed Top Left Fade Grid - Light Mode */}
+      <div
+        className="absolute inset-0 z-0 dark:hidden"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, #e7e5e4 1px, transparent 1px),
+            linear-gradient(to bottom, #e7e5e4 1px, transparent 1px)
+          `,
+          backgroundSize: "20px 20px",
+          backgroundPosition: "0 0, 0 0",
+          maskImage: `
+            repeating-linear-gradient(
+              to right,
+              black 0px,
+              black 3px,
+              transparent 3px,
+              transparent 8px
+            ),
+            repeating-linear-gradient(
+              to bottom,
+              black 0px,
+              black 3px,
+              transparent 3px,
+              transparent 8px
+            ),
+            radial-gradient(ellipse 80% 80% at 0% 0%, #000 50%, transparent 90%)
+          `,
+          WebkitMaskImage: `
+            repeating-linear-gradient(
+              to right,
+              black 0px,
+              black 3px,
+              transparent 3px,
+              transparent 8px
+            ),
+            repeating-linear-gradient(
+              to bottom,
+              black 0px,
+              black 3px,
+              transparent 3px,
+              transparent 8px
+            ),
+            radial-gradient(ellipse 80% 80% at 0% 0%, #000 50%, transparent 90%)
+          `,
+          maskComposite: "intersect",
+          WebkitMaskComposite: "source-in",
+        }}
+      />
+      {/* Dashed Top Left Fade Grid - Dark Mode */}
+      <div
+        className="absolute inset-0 z-0 hidden dark:block"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, rgb(64, 64, 64) 1px, transparent 1px),
+            linear-gradient(to bottom, rgb(64, 64, 64) 1px, transparent 1px)
+          `,
+          backgroundSize: "20px 20px",
+          backgroundPosition: "0 0, 0 0",
+          maskImage: `
+            repeating-linear-gradient(
+              to right,
+              black 0px,
+              black 3px,
+              transparent 3px,
+              transparent 8px
+            ),
+            repeating-linear-gradient(
+              to bottom,
+              black 0px,
+              black 3px,
+              transparent 3px,
+              transparent 8px
+            ),
+            radial-gradient(ellipse 80% 80% at 0% 0%, #000 50%, transparent 90%)
+          `,
+          WebkitMaskImage: `
+            repeating-linear-gradient(
+              to right,
+              black 0px,
+              black 3px,
+              transparent 3px,
+              transparent 8px
+            ),
+            repeating-linear-gradient(
+              to bottom,
+              black 0px,
+              black 3px,
+              transparent 3px,
+              transparent 8px
+            ),
+            radial-gradient(ellipse 80% 80% at 0% 0%, #000 50%, transparent 90%)
+          `,
+          maskComposite: "intersect",
+          WebkitMaskComposite: "source-in",
+        }}
+      />
+      <div className="max-w-(--breakpoint-xl) w-full mx-auto grid grid-cols-1 lg:grid-cols-2 items-start gap-8 lg:gap-12 px-4 sm:px-6 pt-6 lg:pt-0 pb-0 relative z-10">
         <div>
           <Badge
             variant="secondary"
