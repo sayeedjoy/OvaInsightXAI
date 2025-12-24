@@ -3,14 +3,35 @@
 import { motion } from "framer-motion"
 import { MoonIcon, SunIcon } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
 
 import { Button } from "../ui/button"
 
 export function ModeToggle() {
     const { theme, setTheme } = useTheme()
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     const toggleTheme = () => {
         setTheme(theme === "dark" ? "light" : "dark")
+    }
+
+    // Prevent hydration mismatch by showing default state until mounted
+    if (!mounted) {
+        return (
+            <Button
+                variant="outline"
+                size="icon"
+                className="relative size-10 overflow-hidden rounded-full"
+                disabled
+            >
+                <SunIcon className="h-[1.2rem] w-[1.2rem]" />
+                <span className="sr-only">Toggle theme</span>
+            </Button>
+        )
     }
 
     return (

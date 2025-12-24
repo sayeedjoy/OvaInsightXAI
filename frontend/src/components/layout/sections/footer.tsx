@@ -1,6 +1,6 @@
 import { Mail } from "lucide-react"
 import XIcon from "@/components/icons/x-icon"
-import GithubIcon from "@/components/icons/github-icon"
+import { FaGithub } from "react-icons/fa"
 import LinkedInIcon from "@/components/icons/linkedin-icon"
 
 import Image from "next/image"
@@ -19,7 +19,7 @@ const socialLinks: FooterLinkProps[] = [
     {
         href: site.links.github,
         label: "GitHub",
-        icon: <GithubIcon className="size-5 fill-foreground" />,
+        icon: <FaGithub className="size-5" />,
         external: true
     },
     {

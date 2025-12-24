@@ -9,8 +9,9 @@ import { TestimonialSection } from "@/components/layout/sections/testimonial"
 import LogoCloud from "@/components/logo-cloud"
 import { site } from "@/config/site"
 import { ModelSection } from "@/components/layout/sections/model"
-import FeaturesSection from "@/components/features-8"
 import Hero from "@/components/hero"
+import Features from "@/components/features"
+import ModelFeaturesSection from "@/components/model-features"
 export const metadata = {
     title: "Home",
     description: site.description,
@@ -40,8 +41,8 @@ export default function Home() {
     return (
         <>
             <Hero/>
-            <ModelSection />
-            <FeaturesSection/>
+            <Features/>
+            <ModelFeaturesSection/>
             <FAQSection />
         </>
     )

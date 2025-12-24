@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Shield, Users } from 'lucide-react'
 
-export default function FeaturesSection() {
+export default function ModelFeaturesSection() {
     return (
         <section className="bg-gray-50 py-12 sm:py-16 lg:py-20 dark:bg-transparent">
             <div className="mx-auto max-w-5xl px-6">

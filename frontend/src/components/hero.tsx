@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpRight, CirclePlay } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { FaGithub } from "react-icons/fa";
 
 export default function Hero() {
   return (
@@ -15,7 +16,7 @@ export default function Hero() {
             asChild
           >
             <Link href="#">
-              Just released v1.0.0 <ArrowUpRight className="ml-1 size-4" />
+              v1.0.0 Released <ArrowUpRight className="ml-1 size-4" />
             </Link>
           </Badge>
           <h1 className="mt-6 text-4xl md:text-5xl lg:text-[2.75rem] xl:text-[3.25rem] font-semibold leading-[1.2]! tracking-[-0.035em]">
@@ -33,7 +34,8 @@ export default function Hero() {
               size="lg"
               className="rounded-full text-base shadow-none"
             >
-              <CirclePlay className="h-5! w-5!" /> Watch Demo
+              <FaGithub className="h-5 w-5" />
+              Source Code
             </Button>
           </div>
         </div>
