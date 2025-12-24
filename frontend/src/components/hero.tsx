@@ -6,8 +6,8 @@ import Image from "next/image";
 
 export default function Hero() {
   return (
-    <div className="min-h-screen flex items-start justify-center pt-8 lg:pt-2">
-      <div className="max-w-(--breakpoint-xl) w-full mx-auto grid grid-cols-1 lg:grid-cols-2 items-start gap-8 lg:gap-12 px-4 sm:px-6 pt-6 lg:pt-0 pb-4">
+    <div className="min-h-screen flex items-start justify-center pt-8 lg:pt-20">
+      <div className="max-w-(--breakpoint-xl) w-full mx-auto grid grid-cols-1 lg:grid-cols-2 items-start gap-8 lg:gap-12 px-4 sm:px-6 pt-6 lg:pt-0 pb-16 lg:pb-20">
         <div>
           <Badge
             variant="secondary"
