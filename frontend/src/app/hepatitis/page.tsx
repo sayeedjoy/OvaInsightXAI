@@ -85,7 +85,7 @@ export default function HepatitisPredictPage() {
 
         try {
             const minDelayPromise = new Promise((resolve) => {
-                setTimeout(resolve, 5500)
+                setTimeout(resolve, 2000)
             })
 
             const apiPromise = fetch("/api/predict/hepatitis_b", {

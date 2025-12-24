@@ -83,9 +83,9 @@ export default function PredictPage() {
         }
 
         try {
-            // Minimum delay of 5.5 seconds for better UX
+            // Minimum delay of 2 seconds for better UX
             const minDelayPromise = new Promise((resolve) => {
-                setTimeout(resolve, 5500)
+                setTimeout(resolve, 2000)
             })
 
             // API call promise
