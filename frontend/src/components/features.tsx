@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const features = [
   {
@@ -9,6 +10,7 @@ const features = [
     details:
       "Advanced AI model trained to predict ovarian cancer risk using comprehensive medical data. Get accurate predictions to aid in early detection and treatment planning.",
     tutorialLink: "/ovarian",
+    image: "/model-ova.webp",
   },
   {
     category: "Medical Conditions",
@@ -16,6 +18,7 @@ const features = [
     details:
       "State-of-the-art machine learning model for Hepatitis B diagnosis. Analyze patient symptoms and lab results to provide reliable diagnostic insights.",
     tutorialLink: "/hepatitis",
+    image: "/model-hepa.webp",
   },
   {
     category: "Medical Conditions",
@@ -23,6 +26,7 @@ const features = [
     details:
       "Comprehensive AI-powered model for Polycystic Ovary Syndrome prediction. Evaluate multiple health parameters to assist in accurate diagnosis and management.",
     tutorialLink: "/pcos",
+    image: "/model-pcos.webp",
   }
 ];
 
@@ -42,7 +46,17 @@ const Features = () => {
               key={feature.title}
               className="flex flex-col md:flex-row items-center gap-x-12 gap-y-6 md:even:flex-row-reverse"
             >
-              <div className="w-full aspect-[4/3] bg-muted rounded-xl border border-border/50 basis-1/2" />
+              <div className="relative w-full md:basis-1/2 max-w-[200px] sm:max-w-[250px] md:max-w-[280px] lg:max-w-[320px] mx-auto">
+                <div className="relative w-full aspect-[4/3] max-h-[180px] sm:max-h-[220px] md:max-h-[250px] lg:max-h-[280px]">
+                  <Image
+                    src={feature.image}
+                    alt={feature.title}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 640px) 200px, (max-width: 768px) 250px, (max-width: 1024px) 280px, 320px"
+                  />
+                </div>
+              </div>
               <div className="basis-1/2 shrink-0">
                 <span className="uppercase font-medium text-sm text-muted-foreground">
                   {feature.category}
