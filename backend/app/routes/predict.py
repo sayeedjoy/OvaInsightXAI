@@ -18,7 +18,7 @@ from app.schemas.input_schema import (
     PredictionResponse,
 )
 from app.services.preprocessing import request_to_features
-from app.services.xai_service import compute_all_xai_explanations
+from app.services.xai import compute_all_xai_explanations
 from app.utils.config import FeatureOrderError
 
 logger = logging.getLogger(__name__)
