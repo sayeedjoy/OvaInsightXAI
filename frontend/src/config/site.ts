@@ -4,7 +4,7 @@ export const site = {
   name: "MultiDx Clinical AI",
   description: "Advanced ovarian cancer prediction using AI and machine learning",
   url: site_url,
-  ogImage: `${site_url}/og.jpg`,
+  ogImage: `${site_url}/opengraph.webp`,
   logo: "/logo.png",
   mailSupport: "hello@domain.com", // Support email address
   mailFrom: process.env.MAIL_FROM || "noreply@domain.com", // Transactional email address

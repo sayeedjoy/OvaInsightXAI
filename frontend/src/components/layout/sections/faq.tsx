@@ -13,28 +13,28 @@ interface FAQProps {
 
 const FAQList: FAQProps[] = [
     {
-        question: "Is it really free?",
-        answer: "Yes! Free forever with MIT license. Use it for any project, commercial or personal.",
+        question: "What medical conditions can OvaInsightXAI predict?",
+        answer: "OvaInsightXAI can predict three medical conditions: Ovarian Cancer, Hepatitis B, and Polycystic Ovary Syndrome (PCOS). Each model is trained on clinical data to provide accurate predictions based on your input parameters.",
         value: "item-1"
     },
     {
-        question: "What's included?",
-        answer: "Modern landing page and dashboard layout, Authentication with social login, modern UI components, file uploads, and Stripe payments.",
+        question: "How accurate are the predictions?",
+        answer: "Our AI models are trained on validated clinical datasets and undergo rigorous testing. However, predictions should be used as a screening tool and not replace professional medical diagnosis. Always consult with healthcare professionals for definitive diagnosis and treatment.",
         value: "item-2"
     },
     {
-        question: "How fast can I launch my project?",
-        answer: "Get your SaaS project running in under an hour. We handle the boring stuff so you can focus on building your unique features.",
+        question: "Is my medical data secure and private?",
+        answer: "Yes, we take data privacy seriously. Your input data is processed securely and is not stored permanently. We use industry-standard security measures to protect your information. However, we recommend not entering sensitive personal identifiers.",
         value: "item-3"
     },
     {
-        question: "Can I customize the design?",
-        answer: "100%. Built with shadcn/ui components that are fully customizable. Make it match your brand perfectly.",
+        question: "How do I use the prediction models?",
+        answer: "Simply navigate to the specific model page (Ovarian, Hepatitis B, or PCOS), fill in the required clinical parameters, and submit. The AI will analyze your inputs and provide a prediction along with explainable AI visualizations to help you understand the factors influencing the result.",
         value: "item-4"
     },
     {
-        question: "Do you offer support?",
-        answer: "No! But you can join our community on GitHub. We actively maintain the project and welcome contributions.",
+        question: "Can I use this tool for medical diagnosis?",
+        answer: "No. OvaInsightXAI is designed as a research and screening tool to assist healthcare professionals and researchers. It should not be used as a substitute for professional medical advice, diagnosis, or treatment. Always consult qualified healthcare providers for medical decisions.",
         value: "item-5"
     }
 ]

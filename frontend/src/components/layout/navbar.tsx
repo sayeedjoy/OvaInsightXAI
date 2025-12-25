@@ -119,7 +119,7 @@ export const Navbar = () => {
                                     </NavigationMenuLink>
                                 </NavigationMenuItem>
                                 <NavigationMenuItem>
-                                    <NavigationMenuTrigger className="rounded-lg px-4 py-2 font-medium text-sm text-black dark:text-white transition-colors hover:bg-accent/50 hover:text-primary">
+                                    <NavigationMenuTrigger className="rounded-lg px-4 py-2 font-medium text-sm text-black dark:text-white bg-gray-100 dark:bg-gray-800 transition-colors hover:bg-accent/50 hover:text-primary">
                                         Models
                                     </NavigationMenuTrigger>
                                     <NavigationMenuContent>
@@ -227,7 +227,7 @@ export const Navbar = () => {
                                                     {routeList[0].label}
                                                 </Link>
                                             </Button>
-                                            <div className="px-3 py-2 text-sm font-semibold text-black dark:text-white">
+                                            <div className="px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
                                                 Models
                                             </div>
                                             {modelMenuList.map(
