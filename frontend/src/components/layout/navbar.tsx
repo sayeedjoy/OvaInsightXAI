@@ -99,7 +99,7 @@ export const Navbar = () => {
                                 height={30}
                             />
                         </div>
-                        <h3 className="font-bold text-sm lg:text-base">
+                        <h3 className="font-bold text-sm text-black dark:text-white lg:text-base">
                             {site.name}
                         </h3>
                     </Link>
@@ -112,14 +112,14 @@ export const Navbar = () => {
                                     <NavigationMenuLink asChild>
                                         <Link
                                             href={routeList[0].href}
-                                            className="rounded-lg px-4 py-2 font-medium text-sm transition-colors hover:bg-accent/50 hover:text-primary"
+                                            className="rounded-lg px-4 py-2 font-medium text-sm text-black dark:text-white transition-colors hover:bg-accent/50 hover:text-primary"
                                         >
                                             {routeList[0].label}
                                         </Link>
                                     </NavigationMenuLink>
                                 </NavigationMenuItem>
                                 <NavigationMenuItem>
-                                    <NavigationMenuTrigger className="rounded-lg px-4 py-2 font-medium text-sm transition-colors hover:bg-accent/50 hover:text-primary">
+                                    <NavigationMenuTrigger className="rounded-lg px-4 py-2 font-medium text-sm text-black dark:text-white transition-colors hover:bg-accent/50 hover:text-primary">
                                         Models
                                     </NavigationMenuTrigger>
                                     <NavigationMenuContent>
@@ -149,7 +149,7 @@ export const Navbar = () => {
                                         <NavigationMenuLink asChild>
                                             <Link
                                                 href={href}
-                                                className="rounded-lg px-4 py-2 font-medium text-sm transition-colors hover:bg-accent/50 hover:text-primary"
+                                                className="rounded-lg px-4 py-2 font-medium text-sm text-black dark:text-white transition-colors hover:bg-accent/50 hover:text-primary"
                                             >
                                                 {label}
                                             </Link>
@@ -202,7 +202,7 @@ export const Navbar = () => {
                                                     width={32}
                                                     height={32}
                                                 />
-                                                <span className="font-bold text-lg">
+                                                <span className="font-bold text-lg text-black dark:text-white">
                                                     {site.name}
                                                 </span>
                                             </Link>
@@ -221,13 +221,13 @@ export const Navbar = () => {
                                                 }
                                                 asChild
                                                 variant="ghost"
-                                                className="h-auto w-full justify-start px-3 py-2.5 font-medium hover:bg-accent/50"
+                                                className="h-auto w-full justify-start px-3 py-2.5 font-medium text-black dark:text-white hover:bg-accent/50"
                                             >
                                                 <Link href={routeList[0].href}>
                                                     {routeList[0].label}
                                                 </Link>
                                             </Button>
-                                            <div className="px-3 py-2 text-sm font-semibold text-muted-foreground">
+                                            <div className="px-3 py-2 text-sm font-semibold text-black dark:text-white">
                                                 Models
                                             </div>
                                             {modelMenuList.map(
@@ -263,7 +263,7 @@ export const Navbar = () => {
                                                         }
                                                         asChild
                                                         variant="ghost"
-                                                        className="h-auto w-full justify-start px-3 py-2.5 font-medium hover:bg-accent/50"
+                                                        className="h-auto w-full justify-start px-3 py-2.5 font-medium text-black dark:text-white hover:bg-accent/50"
                                                     >
                                                         <Link href={href}>
                                                             {label}

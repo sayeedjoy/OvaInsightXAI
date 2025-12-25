@@ -36,7 +36,7 @@ export function PredictionLoading({ isVisible }: PredictionLoadingProps) {
     if (!isVisible) return null
 
     return (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/60 rounded-lg">
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm rounded-lg border border-border/50">
             {/* Spinner */}
             <div className="flex items-center justify-center">
                 <Loader2 className="h-16 w-16 animate-spin text-primary sm:h-20 sm:w-20" />
@@ -45,7 +45,7 @@ export function PredictionLoading({ isVisible }: PredictionLoadingProps) {
             {/* Rotating ML/AI Terms */}
             <div className="mt-6 flex justify-center px-4">
                 <div className="min-h-[2rem] text-center">
-                    <p className="text-sm font-medium text-muted-foreground transition-opacity duration-500 sm:text-base">
+                    <p className="text-sm font-medium text-foreground transition-opacity duration-500 sm:text-base">
                         {ML_TERMS[currentTermIndex]}
                     </p>
                 </div>
