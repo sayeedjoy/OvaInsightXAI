@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from app.model.registry import MODEL_REGISTRY
@@ -10,13 +11,25 @@ from app.services.xai.utils import generate_training_data, get_model_and_feature
 
 logger = logging.getLogger(__name__)
 
+# Environment-configurable sample sizes for performance tuning
+DEFAULT_TRAINING_SAMPLES = int(os.getenv("LIME_TRAINING_SAMPLES", "200"))
+DEFAULT_NUM_SAMPLES = int(os.getenv("LIME_NUM_SAMPLES", "1000"))  # LIME perturbation samples
+
 
 def compute_lime_explanation(
     model_key: str,
     instance_features: list[float],
-    num_features: int = 10
+    num_features: int = 10,
+    training_samples: int | None = None,
+    num_samples: int | None = None
 ) -> dict[str, Any]:
     """Compute LIME explanation for the prediction."""
+    # Use environment-configurable defaults
+    if training_samples is None:
+        training_samples = DEFAULT_TRAINING_SAMPLES
+    if num_samples is None:
+        num_samples = DEFAULT_NUM_SAMPLES
+    
     try:
         from lime import lime_tabular
         logger.debug("LIME library imported successfully")
@@ -32,8 +45,8 @@ def compute_lime_explanation(
         config = MODEL_REGISTRY[model_key]
 
         # Generate training data for LIME (as numpy array - LIME expects arrays)
-        # Reduced from 1000 to 500 for better performance
-        X_train, _ = generate_training_data(model_key, n_samples=500, return_dataframe=False)
+        # Reduced sample size for better performance
+        X_train, _ = generate_training_data(model_key, n_samples=training_samples, return_dataframe=False)
 
         # Create LIME explainer
         explainer = lime_tabular.LimeTabularExplainer(
@@ -43,16 +56,26 @@ def compute_lime_explanation(
             random_state=42
         )
 
-        # Explain the instance
+        # Explain the instance with reduced sample count for speed
         explanation = explainer.explain_instance(
             instance_array[0],
             model.predict_proba if hasattr(model, "predict_proba") else model.predict,
             num_features=num_features,
-            top_labels=1
+            top_labels=1,
+            num_samples=num_samples  # Reduced from default 5000 for better performance
         )
 
         # Extract explanation
-        exp_list = explanation.as_list()
+        # When top_labels is used, we need to get the label from available_labels
+        available_labels = explanation.available_labels()
+        if available_labels:
+            # Use the first available label (positive class for binary classification)
+            label = available_labels[0]
+            exp_list = explanation.as_list(label=label)
+        else:
+            # Fallback: try without label parameter
+            exp_list = explanation.as_list()
+        
         feature_importance = [
             {
                 "feature": item[0],

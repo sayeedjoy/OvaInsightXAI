@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import os
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Any
 
 from app.services.xai.ale_explainer import compute_ale_1d
@@ -9,6 +12,8 @@ from app.services.xai.ice_explainer import compute_ice_1d
 from app.services.xai.lime_explainer import compute_lime_explanation
 from app.services.xai.pdp_explainer import compute_pdp_1d
 from app.services.xai.shap_explainer import compute_shap_explanation
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "compute_shap_explanation",
@@ -19,17 +24,70 @@ __all__ = [
     "compute_all_xai_explanations",
 ]
 
+# Environment-aware configuration
+# In deployment, we use shorter timeouts and run in parallel
+XAI_TIMEOUT_SECONDS = int(os.getenv("XAI_TIMEOUT_SECONDS", "30"))
+XAI_PARALLEL = os.getenv("XAI_PARALLEL", "true").lower() == "true"
+
+
+def _safe_compute(func, *args, **kwargs) -> dict[str, Any]:
+    """Safely execute an XAI computation and catch any exceptions."""
+    try:
+        return func(*args, **kwargs)
+    except Exception as exc:
+        logger.error("XAI computation failed for %s: %s", func.__name__, exc, exc_info=True)
+        return {"error": str(exc), "error_type": type(exc).__name__}
+
 
 def compute_all_xai_explanations(
     model_key: str,
     instance_features: list[float]
 ) -> dict[str, Any]:
-    """Compute all XAI explanations for a prediction instance."""
-    return {
-        "shap": compute_shap_explanation(model_key, instance_features),
-        "lime": compute_lime_explanation(model_key, instance_features),
-        "pdp_1d": compute_pdp_1d(model_key),
-        "ice_1d": compute_ice_1d(model_key),
-        "ale_1d": compute_ale_1d(model_key),
-    }
+    """Compute all XAI explanations for a prediction instance.
+    
+    Uses parallel computation for faster results. All 5 XAI methods
+    run concurrently using ThreadPoolExecutor.
+    """
+    if XAI_PARALLEL:
+        return _compute_parallel(model_key, instance_features)
+    else:
+        return _compute_sequential(model_key, instance_features)
 
+
+def _compute_parallel(model_key: str, instance_features: list[float]) -> dict[str, Any]:
+    """Compute all XAI explanations in parallel using ThreadPoolExecutor."""
+    results = {}
+    
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        # Submit all tasks
+        futures = {
+            "shap": executor.submit(_safe_compute, compute_shap_explanation, model_key, instance_features),
+            "lime": executor.submit(_safe_compute, compute_lime_explanation, model_key, instance_features),
+            "pdp_1d": executor.submit(_safe_compute, compute_pdp_1d, model_key),
+            "ice_1d": executor.submit(_safe_compute, compute_ice_1d, model_key),
+            "ale_1d": executor.submit(_safe_compute, compute_ale_1d, model_key),
+        }
+        
+        # Collect results with timeout
+        for key, future in futures.items():
+            try:
+                results[key] = future.result(timeout=XAI_TIMEOUT_SECONDS)
+            except FuturesTimeoutError:
+                logger.warning("XAI computation timed out for %s after %ds", key, XAI_TIMEOUT_SECONDS)
+                results[key] = {"error": f"Computation timed out after {XAI_TIMEOUT_SECONDS}s", "error_type": "TimeoutError"}
+            except Exception as exc:
+                logger.error("Unexpected error getting result for %s: %s", key, exc, exc_info=True)
+                results[key] = {"error": str(exc), "error_type": type(exc).__name__}
+    
+    return results
+
+
+def _compute_sequential(model_key: str, instance_features: list[float]) -> dict[str, Any]:
+    """Compute all XAI explanations sequentially (fallback mode)."""
+    return {
+        "shap": _safe_compute(compute_shap_explanation, model_key, instance_features),
+        "lime": _safe_compute(compute_lime_explanation, model_key, instance_features),
+        "pdp_1d": _safe_compute(compute_pdp_1d, model_key),
+        "ice_1d": _safe_compute(compute_ice_1d, model_key),
+        "ale_1d": _safe_compute(compute_ale_1d, model_key),
+    }

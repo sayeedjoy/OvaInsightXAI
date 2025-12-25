@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import numpy as np
@@ -14,12 +15,18 @@ from app.services.xai.utils import generate_training_data, get_model_and_feature
 
 logger = logging.getLogger(__name__)
 
+# Environment-configurable sample sizes for performance tuning
+DEFAULT_BACKGROUND_SAMPLES = int(os.getenv("SHAP_BACKGROUND_SAMPLES", "30"))
+
 
 def compute_shap_explanation(
     model_key: str,
     instance_features: list[float],
-    background_samples: int = 50
+    background_samples: int | None = None
 ) -> dict[str, Any]:
+    # Use environment-configurable default for background samples
+    if background_samples is None:
+        background_samples = DEFAULT_BACKGROUND_SAMPLES
     """Compute SHAP values for the prediction."""
     try:
         import shap

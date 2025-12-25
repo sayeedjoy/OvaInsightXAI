@@ -23,8 +23,8 @@ def compute_ale_1d(
         model, _ = get_model_and_features(model_key, [0.0] * len(MODEL_REGISTRY[model_key].feature_order))
         config = MODEL_REGISTRY[model_key]
 
-        # Generate background data (reduced from 500 to 300 for better performance)
-        X_background, _ = generate_training_data(model_key, n_samples=300)
+        # Generate background data (reduced for better performance)
+        X_background, _ = generate_training_data(model_key, n_samples=200)
 
         feature_names = config.feature_order
         results = []
