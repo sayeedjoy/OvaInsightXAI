@@ -1,13 +1,175 @@
 "use client"
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import { useEffect, useRef } from "react"
+import { useTheme } from "next-themes"
+import * as echarts from "echarts"
 import type { SHAPExplanation } from "@/types/xai"
+import { getEChartsTheme, getEChartsBaseOption } from "@/lib/echarts-theme"
 
 interface SHAPVisualizationProps {
     explanation: SHAPExplanation
 }
 
 export function SHAPVisualization({ explanation }: SHAPVisualizationProps) {
+    const chartRef = useRef<HTMLDivElement>(null)
+    const chartInstanceRef = useRef<echarts.ECharts | null>(null)
+    const { theme: currentTheme } = useTheme()
+
+    useEffect(() => {
+        if (!chartRef.current) return
+
+        if (explanation.error) {
+            return
+        }
+
+        if (!explanation.contributions || explanation.contributions.length === 0) {
+            return
+        }
+
+        // Initialize chart
+        if (!chartInstanceRef.current) {
+            chartInstanceRef.current = echarts.init(chartRef.current)
+        }
+
+        const chart = chartInstanceRef.current
+        const isDark = currentTheme === "dark"
+        const theme = getEChartsTheme(isDark)
+
+        // Sort by absolute SHAP value for better visualization
+        const sortedContributions = [...explanation.contributions].sort(
+            (a, b) => Math.abs(b.shap_value) - Math.abs(a.shap_value)
+        )
+
+        const data = sortedContributions.map((contrib) => ({
+            value: contrib.shap_value,
+            feature: contrib.feature,
+            originalValue: contrib.value,
+        }))
+
+        const option: echarts.EChartsOption = {
+            ...getEChartsBaseOption(),
+            grid: {
+                left: 120,
+                right: 40,
+                top: 20,
+                bottom: 20,
+                containLabel: false,
+            },
+            xAxis: {
+                type: "value",
+                name: "SHAP Value",
+                nameLocation: "middle",
+                nameGap: 30,
+                nameTextStyle: {
+                    color: theme.textColor,
+                    fontSize: 12,
+                },
+                axisLabel: {
+                    color: theme.textColor,
+                },
+                axisLine: {
+                    lineStyle: {
+                        color: theme.gridColor,
+                    },
+                },
+                splitLine: {
+                    show: true,
+                    lineStyle: {
+                        color: theme.gridColor,
+                        type: "dashed",
+                    },
+                },
+            },
+            yAxis: {
+                type: "category",
+                data: data.map((d) => d.feature),
+                axisLabel: {
+                    color: theme.textColor,
+                    fontSize: 11,
+                    interval: 0,
+                },
+                axisLine: {
+                    lineStyle: {
+                        color: theme.gridColor,
+                    },
+                },
+            },
+            tooltip: {
+                ...getEChartsBaseOption().tooltip,
+                trigger: "axis",
+                axisPointer: {
+                    type: "shadow",
+                },
+                formatter: (params) => {
+                    const param = Array.isArray(params) ? params[0] : params
+                    // ECharts passes data in param.data for bar charts
+                    const dataPoint = param.data as { value: number; feature?: string; originalValue?: number }
+                    const featureName = dataPoint?.feature || param.name || "Unknown"
+                    const shapValue = dataPoint?.value ?? param.value ?? 0
+                    const originalValue = dataPoint?.originalValue
+                    
+                    let content = `
+                        <div style="margin: 4px 0;">
+                            <strong>${featureName}</strong>
+                        </div>
+                        <div style="margin: 4px 0;">
+                            SHAP Value: <code>${typeof shapValue === "number" ? shapValue.toFixed(4) : shapValue}</code>
+                        </div>
+                    `
+                    
+                    if (originalValue !== undefined && originalValue !== null && typeof originalValue === "number") {
+                        content += `
+                            <div style="margin: 4px 0;">
+                                Feature Value: <code>${originalValue.toFixed(2)}</code>
+                            </div>
+                        `
+                    }
+                    
+                    return content
+                },
+            },
+            series: [
+                {
+                    type: "bar",
+                    data: data.map((d) => ({
+                        value: d.value,
+                        feature: d.feature,
+                        originalValue: d.originalValue,
+                        itemStyle: {
+                            color: d.value >= 0 ? theme.positiveColor : theme.negativeColor,
+                        },
+                    })),
+                    barWidth: "60%",
+                    label: {
+                        show: false,
+                    },
+                },
+            ],
+        }
+
+        chart.setOption(option)
+
+        // Handle resize
+        const handleResize = () => {
+            chart.resize()
+        }
+        window.addEventListener("resize", handleResize)
+
+        return () => {
+            window.removeEventListener("resize", handleResize)
+        }
+    }, [explanation, currentTheme])
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.dispose()
+                chartInstanceRef.current = null
+            }
+        }
+    }, [])
+
     if (explanation.error) {
         return (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
@@ -24,22 +186,6 @@ export function SHAPVisualization({ explanation }: SHAPVisualizationProps) {
         )
     }
 
-    // Sort by absolute SHAP value for better visualization
-    const sortedContributions = [...explanation.contributions].sort(
-        (a, b) => Math.abs(b.shap_value) - Math.abs(a.shap_value)
-    )
-
-    const data = sortedContributions.map((contrib) => ({
-        feature: contrib.feature,
-        shapValue: contrib.shap_value,
-        value: contrib.value,
-    }))
-
-    // Color bars based on positive/negative SHAP values
-    const getColor = (value: number) => {
-        return value >= 0 ? "hsl(var(--chart-1))" : "hsl(var(--chart-2))"
-    }
-
     return (
         <div className="space-y-4">
             {explanation.base_value !== null && explanation.base_value !== undefined && (
@@ -47,51 +193,13 @@ export function SHAPVisualization({ explanation }: SHAPVisualizationProps) {
                     Base value: <span className="font-medium">{explanation.base_value.toFixed(4)}</span>
                 </div>
             )}
-            <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" label={{ value: "SHAP Value", position: "insideBottom", offset: -5 }} />
-                    <YAxis
-                        type="category"
-                        dataKey="feature"
-                        width={90}
-                        tick={{ fontSize: 12 }}
-                        angle={-45}
-                        textAnchor="end"
-                    />
-                    <Tooltip
-                        content={({ active, payload }) => {
-                            if (active && payload && payload.length > 0) {
-                                const data = payload[0].payload as typeof data[number]
-                                return (
-                                    <div className="rounded-lg border bg-background p-3 shadow-md">
-                                        <p className="font-medium">{data.feature}</p>
-                                        <p className="text-sm">
-                                            SHAP Value: <span className="font-mono">{data.shapValue.toFixed(4)}</span>
-                                        </p>
-                                        <p className="text-sm">
-                                            Feature Value: <span className="font-mono">{data.value.toFixed(2)}</span>
-                                        </p>
-                                    </div>
-                                )
-                            }
-                            return null
-                        }}
-                    />
-                    <Bar dataKey="shapValue" radius={[0, 4, 4, 0]}>
-                        {data.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={getColor(entry.shapValue)} />
-                        ))}
-                    </Bar>
-                </BarChart>
-            </ResponsiveContainer>
+            <div ref={chartRef} className="h-[400px] w-full" />
             <div className="text-xs text-muted-foreground">
                 <p>
-                    Positive SHAP values (red) push the prediction toward the positive class, while negative values
-                    (blue) push toward the negative class.
+                    Positive SHAP values (green) push the prediction toward the positive class, while negative values
+                    (red) push toward the negative class.
                 </p>
             </div>
         </div>
     )
 }
-

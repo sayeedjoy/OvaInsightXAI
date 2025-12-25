@@ -138,37 +138,75 @@ def compute_shap_explanation(
         # Get background data
         X_background, _ = _generate_training_data(model_key, n_samples=background_samples)
 
-        # Determine explainer type based on model
-        model_type = type(model).__name__
-        if hasattr(model, "named_steps") and "classifier" in model.named_steps:
-            classifier = model.named_steps["classifier"]
-            classifier_type = type(classifier).__name__
+        # Extract the final estimator from Pipeline if needed
+        from sklearn.pipeline import Pipeline
+        if isinstance(model, Pipeline):
+            # Get the final step (classifier/estimator)
+            final_step_name, final_estimator = model.steps[-1]
+            classifier_type = type(final_estimator).__name__
+            logger.debug("Extracted classifier from Pipeline: %s (type: %s)", final_step_name, classifier_type)
         else:
-            classifier_type = model_type
+            final_estimator = model
+            classifier_type = type(model).__name__
 
         # Use appropriate explainer
+        # For TreeExplainer and LinearExplainer, we need to use the pipeline for predictions
+        # but can use the final estimator for explainer initialization
         if "Tree" in classifier_type or "XGB" in classifier_type or "LGBM" in classifier_type:
+            # TreeExplainer can work with the pipeline directly
             explainer = shap.TreeExplainer(model, X_background)
         elif "Linear" in classifier_type or "Logistic" in classifier_type:
-            explainer = shap.LinearExplainer(model, X_background)
+            # LinearExplainer needs the actual estimator, not the pipeline
+            # But we need to transform the background data through the pipeline steps first
+            if isinstance(model, Pipeline):
+                # Transform background data through pipeline steps (except the final estimator)
+                X_transformed = X_background
+                for step_name, step_transformer in model.steps[:-1]:
+                    X_transformed = step_transformer.transform(X_transformed)
+                # Use the transformed data and final estimator for LinearExplainer
+                explainer = shap.LinearExplainer(final_estimator, X_transformed)
+            else:
+                explainer = shap.LinearExplainer(model, X_background)
         else:
             # Fallback to KernelExplainer (slower but works for any model)
+            # This works with the full pipeline
             explainer = shap.KernelExplainer(model.predict_proba, X_background)
 
-        shap_values = explainer(instance_array)
+        # For LinearExplainer with Pipeline, we need to transform the instance too
+        if isinstance(model, Pipeline) and ("Linear" in classifier_type or "Logistic" in classifier_type):
+            # Transform instance through pipeline steps (except the final estimator)
+            instance_transformed = instance_array
+            for step_name, step_transformer in model.steps[:-1]:
+                instance_transformed = step_transformer.transform(instance_transformed)
+            shap_values = explainer(instance_transformed)
+        else:
+            # For other explainers, use the original instance array
+            shap_values = explainer(instance_array)
 
         # Extract values
         if hasattr(shap_values, "values"):
             values = shap_values.values[0]
             base_value = float(shap_values.base_values[0]) if hasattr(shap_values, "base_values") else None
         else:
-            # For KernelExplainer
-            values = shap_values[0].values if len(shap_values) > 0 else []
-            base_value = float(shap_values[0].base_values) if hasattr(shap_values[0], "base_values") else None
+            # For KernelExplainer or when shap_values is a list
+            if isinstance(shap_values, list) and len(shap_values) > 0:
+                values = shap_values[0].values if hasattr(shap_values[0], "values") else shap_values[0]
+                base_value = float(shap_values[0].base_values) if hasattr(shap_values[0], "base_values") else None
+            else:
+                values = shap_values.values if hasattr(shap_values, "values") else shap_values
+                base_value = float(shap_values.base_values) if hasattr(shap_values, "base_values") else None
 
-        # For binary classification, get values for positive class
+        # Ensure values is a numpy array
+        import numpy as np
+        if not isinstance(values, np.ndarray):
+            values = np.array(values)
+
+        # For binary classification, get values for the positive class
         if len(values.shape) > 1:
-            values = values[:, 1]  # Positive class
+            values = values[:, 1] if values.shape[1] > 1 else values[:, 0]
+        elif len(values.shape) == 0:
+            # Scalar value, convert to array
+            values = np.array([values])
 
         feature_names = config.feature_order
         contributions = [

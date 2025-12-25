@@ -1,15 +1,195 @@
 "use client"
 
-import { useState } from "react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useEffect, useRef, useState } from "react"
+import { useTheme } from "next-themes"
+import * as echarts from "echarts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ALE1DResponse } from "@/types/xai"
+import { getEChartsTheme, getEChartsBaseOption } from "@/lib/echarts-theme"
 
 interface ALEVisualizationProps {
     explanation: ALE1DResponse
 }
 
 export function ALEVisualization({ explanation }: ALEVisualizationProps) {
+    const chartRef = useRef<HTMLDivElement>(null)
+    const chartInstanceRef = useRef<echarts.ECharts | null>(null)
+    const { theme: currentTheme } = useTheme()
+    const [selectedFeature, setSelectedFeature] = useState(explanation.ale_plots[0]?.feature || "")
+
+    const selectedPlot = explanation.ale_plots.find((plot) => plot.feature === selectedFeature)
+
+    useEffect(() => {
+        if (!chartRef.current || !selectedPlot) return
+
+        if (explanation.error) {
+            return
+        }
+
+        // Initialize chart
+        if (!chartInstanceRef.current) {
+            chartInstanceRef.current = echarts.init(chartRef.current)
+        }
+
+        const chart = chartInstanceRef.current
+        const isDark = currentTheme === "dark"
+        const theme = getEChartsTheme(isDark)
+
+        const data = selectedPlot.bin_centers.map((center, index) => [
+            center,
+            selectedPlot.ale_values[index],
+        ])
+
+        const option: echarts.EChartsOption = {
+            ...getEChartsBaseOption(),
+            grid: {
+                left: 60,
+                right: 40,
+                top: 20,
+                bottom: 40,
+                containLabel: true,
+            },
+            xAxis: {
+                type: "value",
+                name: selectedFeature,
+                nameLocation: "middle",
+                nameGap: 30,
+                nameTextStyle: {
+                    color: theme.textColor,
+                    fontSize: 12,
+                },
+                axisLabel: {
+                    color: theme.textColor,
+                },
+                axisLine: {
+                    lineStyle: {
+                        color: theme.gridColor,
+                    },
+                },
+                splitLine: {
+                    show: true,
+                    lineStyle: {
+                        color: theme.gridColor,
+                        type: "dashed",
+                    },
+                },
+            },
+            yAxis: {
+                type: "value",
+                name: "ALE Value",
+                nameLocation: "middle",
+                nameGap: 50,
+                nameTextStyle: {
+                    color: theme.textColor,
+                    fontSize: 12,
+                },
+                axisLabel: {
+                    color: theme.textColor,
+                },
+                axisLine: {
+                    lineStyle: {
+                        color: theme.gridColor,
+                    },
+                },
+                splitLine: {
+                    show: true,
+                    lineStyle: {
+                        color: theme.gridColor,
+                        type: "dashed",
+                    },
+                },
+            },
+            tooltip: {
+                ...getEChartsBaseOption().tooltip,
+                trigger: "axis",
+                formatter: (params) => {
+                    const param = Array.isArray(params) ? params[0] : params
+                    const value = param.value as [number, number]
+                    return `
+                        <div style="margin: 4px 0;">
+                            <strong>${selectedFeature}</strong>
+                        </div>
+                        <div style="margin: 4px 0;">
+                            Bin Center: <code>${value[0].toFixed(2)}</code>
+                        </div>
+                        <div style="margin: 4px 0;">
+                            ALE Value: <code>${value[1].toFixed(4)}</code>
+                        </div>
+                    `
+                },
+            },
+            series: [
+                {
+                    type: "line",
+                    data: data,
+                    smooth: true,
+                    symbol: "circle",
+                    symbolSize: 6,
+                    lineStyle: {
+                        color: theme.primaryColor,
+                        width: 2,
+                    },
+                    itemStyle: {
+                        color: theme.primaryColor,
+                        borderColor: theme.isDark ? "#1f2937" : "#ffffff",
+                        borderWidth: 2,
+                    },
+                    areaStyle: {
+                        color: {
+                            type: "linear",
+                            x: 0,
+                            y: 0,
+                            x2: 0,
+                            y2: 1,
+                            colorStops: [
+                                {
+                                    offset: 0,
+                                    color: theme.isDark
+                                        ? "rgba(96, 165, 250, 0.3)"
+                                        : "rgba(37, 99, 235, 0.2)",
+                                },
+                                {
+                                    offset: 1,
+                                    color: theme.isDark
+                                        ? "rgba(96, 165, 250, 0.05)"
+                                        : "rgba(37, 99, 235, 0.05)",
+                                },
+                            ],
+                        },
+                    },
+                    emphasis: {
+                        focus: "series",
+                        itemStyle: {
+                            borderWidth: 3,
+                        },
+                    },
+                },
+            ],
+        }
+
+        chart.setOption(option)
+
+        // Handle resize
+        const handleResize = () => {
+            chart.resize()
+        }
+        window.addEventListener("resize", handleResize)
+
+        return () => {
+            window.removeEventListener("resize", handleResize)
+        }
+    }, [explanation, selectedFeature, selectedPlot, currentTheme])
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.dispose()
+                chartInstanceRef.current = null
+            }
+        }
+    }, [])
+
     if (explanation.error) {
         return (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
@@ -26,18 +206,9 @@ export function ALEVisualization({ explanation }: ALEVisualizationProps) {
         )
     }
 
-    const [selectedFeature, setSelectedFeature] = useState(explanation.ale_plots[0]?.feature || "")
-
-    const selectedPlot = explanation.ale_plots.find((plot) => plot.feature === selectedFeature)
-
     if (!selectedPlot) {
         return null
     }
-
-    const data = selectedPlot.bin_centers.map((center, index) => ({
-        binCenter: center,
-        aleValue: selectedPlot.ale_values[index],
-    }))
 
     return (
         <div className="space-y-4">
@@ -56,42 +227,7 @@ export function ALEVisualization({ explanation }: ALEVisualizationProps) {
                     </SelectContent>
                 </Select>
             </div>
-            <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                        dataKey="binCenter"
-                        label={{ value: selectedFeature, position: "insideBottom", offset: -5 }}
-                    />
-                    <YAxis label={{ value: "ALE Value", angle: -90, position: "insideLeft" }} />
-                    <Tooltip
-                        content={({ active, payload }) => {
-                            if (active && payload && payload.length > 0) {
-                                const data = payload[0].payload as typeof data[number]
-                                return (
-                                    <div className="rounded-lg border bg-background p-3 shadow-md">
-                                        <p className="font-medium">{selectedFeature}</p>
-                                        <p className="text-sm">
-                                            Bin Center: <span className="font-mono">{data.binCenter.toFixed(2)}</span>
-                                        </p>
-                                        <p className="text-sm">
-                                            ALE Value: <span className="font-mono">{data.aleValue.toFixed(4)}</span>
-                                        </p>
-                                    </div>
-                                )
-                            }
-                            return null
-                        }}
-                    />
-                    <Line
-                        type="monotone"
-                        dataKey="aleValue"
-                        stroke="hsl(var(--chart-1))"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                    />
-                </LineChart>
-            </ResponsiveContainer>
+            <div ref={chartRef} className="h-[400px] w-full" />
             <div className="text-xs text-muted-foreground">
                 <p>
                     Accumulated Local Effects (ALE) plots show the accumulated local effect of a feature on the
@@ -101,4 +237,3 @@ export function ALEVisualization({ explanation }: ALEVisualizationProps) {
         </div>
     )
 }
-

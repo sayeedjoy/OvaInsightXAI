@@ -1,13 +1,157 @@
 "use client"
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import { useEffect, useRef } from "react"
+import { useTheme } from "next-themes"
+import * as echarts from "echarts"
 import type { LIMEExplanation } from "@/types/xai"
+import { getEChartsTheme, getEChartsBaseOption } from "@/lib/echarts-theme"
 
 interface LIMEVisualizationProps {
     explanation: LIMEExplanation
 }
 
 export function LIMEVisualization({ explanation }: LIMEVisualizationProps) {
+    const chartRef = useRef<HTMLDivElement>(null)
+    const chartInstanceRef = useRef<echarts.ECharts | null>(null)
+    const { theme: currentTheme } = useTheme()
+
+    useEffect(() => {
+        if (!chartRef.current) return
+
+        if (explanation.error) {
+            return
+        }
+
+        if (!explanation.feature_importance || explanation.feature_importance.length === 0) {
+            return
+        }
+
+        // Initialize chart
+        if (!chartInstanceRef.current) {
+            chartInstanceRef.current = echarts.init(chartRef.current)
+        }
+
+        const chart = chartInstanceRef.current
+        const isDark = currentTheme === "dark"
+        const theme = getEChartsTheme(isDark)
+
+        // Sort by absolute importance
+        const sortedFeatures = [...explanation.feature_importance].sort(
+            (a, b) => Math.abs(b.importance) - Math.abs(a.importance)
+        )
+
+        const data = sortedFeatures.map((feat) => ({
+            value: feat.importance,
+            feature: feat.feature,
+        }))
+
+        const option: echarts.EChartsOption = {
+            ...getEChartsBaseOption(),
+            grid: {
+                left: 120,
+                right: 40,
+                top: 20,
+                bottom: 20,
+                containLabel: false,
+            },
+            xAxis: {
+                type: "value",
+                name: "Importance",
+                nameLocation: "middle",
+                nameGap: 30,
+                nameTextStyle: {
+                    color: theme.textColor,
+                    fontSize: 12,
+                },
+                axisLabel: {
+                    color: theme.textColor,
+                },
+                axisLine: {
+                    lineStyle: {
+                        color: theme.gridColor,
+                    },
+                },
+                splitLine: {
+                    show: true,
+                    lineStyle: {
+                        color: theme.gridColor,
+                        type: "dashed",
+                    },
+                },
+            },
+            yAxis: {
+                type: "category",
+                data: data.map((d) => d.feature),
+                axisLabel: {
+                    color: theme.textColor,
+                    fontSize: 11,
+                    interval: 0,
+                },
+                axisLine: {
+                    lineStyle: {
+                        color: theme.gridColor,
+                    },
+                },
+            },
+            tooltip: {
+                ...getEChartsBaseOption().tooltip,
+                trigger: "axis",
+                axisPointer: {
+                    type: "shadow",
+                },
+                formatter: (params) => {
+                    const param = Array.isArray(params) ? params[0] : params
+                    const data = param.data as typeof data[number]
+                    return `
+                        <div style="margin: 4px 0;">
+                            <strong>${data.feature}</strong>
+                        </div>
+                        <div style="margin: 4px 0;">
+                            Importance: <code>${data.value.toFixed(4)}</code>
+                        </div>
+                    `
+                },
+            },
+            series: [
+                {
+                    type: "bar",
+                    data: data.map((d) => ({
+                        value: d.value,
+                        itemStyle: {
+                            color: d.value >= 0 ? theme.positiveColor : theme.negativeColor,
+                        },
+                    })),
+                    barWidth: "60%",
+                    label: {
+                        show: false,
+                    },
+                },
+            ],
+        }
+
+        chart.setOption(option)
+
+        // Handle resize
+        const handleResize = () => {
+            chart.resize()
+        }
+        window.addEventListener("resize", handleResize)
+
+        return () => {
+            window.removeEventListener("resize", handleResize)
+        }
+    }, [explanation, currentTheme])
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.dispose()
+                chartInstanceRef.current = null
+            }
+        }
+    }, [])
+
     if (explanation.error) {
         return (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
@@ -24,65 +168,15 @@ export function LIMEVisualization({ explanation }: LIMEVisualizationProps) {
         )
     }
 
-    // Sort by absolute importance
-    const sortedFeatures = [...explanation.feature_importance].sort(
-        (a, b) => Math.abs(b.importance) - Math.abs(a.importance)
-    )
-
-    const data = sortedFeatures.map((feat) => ({
-        feature: feat.feature,
-        importance: feat.importance,
-    }))
-
-    // Color bars based on positive/negative importance
-    const getColor = (value: number) => {
-        return value >= 0 ? "hsl(var(--chart-1))" : "hsl(var(--chart-2))"
-    }
-
     return (
         <div className="space-y-4">
-            <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" label={{ value: "Importance", position: "insideBottom", offset: -5 }} />
-                    <YAxis
-                        type="category"
-                        dataKey="feature"
-                        width={90}
-                        tick={{ fontSize: 12 }}
-                        angle={-45}
-                        textAnchor="end"
-                    />
-                    <Tooltip
-                        content={({ active, payload }) => {
-                            if (active && payload && payload.length > 0) {
-                                const data = payload[0].payload as typeof data[number]
-                                return (
-                                    <div className="rounded-lg border bg-background p-3 shadow-md">
-                                        <p className="font-medium">{data.feature}</p>
-                                        <p className="text-sm">
-                                            Importance: <span className="font-mono">{data.importance.toFixed(4)}</span>
-                                        </p>
-                                    </div>
-                                )
-                            }
-                            return null
-                        }}
-                    />
-                    <Bar dataKey="importance" radius={[0, 4, 4, 0]}>
-                        {data.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={getColor(entry.importance)} />
-                        ))}
-                    </Bar>
-                </BarChart>
-            </ResponsiveContainer>
+            <div ref={chartRef} className="h-[400px] w-full" />
             <div className="text-xs text-muted-foreground">
                 <p>
-                    LIME shows how each feature locally affects the prediction. Positive values (red) increase the
-                    prediction, negative values (blue) decrease it.
+                    LIME shows how each feature locally affects the prediction. Positive values (green) increase the
+                    prediction, negative values (red) decrease it.
                 </p>
             </div>
         </div>
     )
 }
-
