@@ -12,6 +12,7 @@ import { ModelSection } from "@/components/layout/sections/model"
 import Hero from "@/components/hero"
 import Features from "@/components/features"
 import ModelFeaturesSection from "@/components/model-features"
+import Team from "@/components/team"
 export const metadata = {
     title: "Home",
     description: site.description,
@@ -43,6 +44,7 @@ export default function Home() {
             <Hero/>
             <Features/>
             <ModelFeaturesSection/>
+            <Team/>
             <FAQSection />
         </>
     )

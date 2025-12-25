@@ -64,7 +64,8 @@ def compute_shap_explanation(
         # For LinearExplainer with Pipeline, we need to transform the instance too
         if isinstance(model, Pipeline) and ("Linear" in classifier_type or "Logistic" in classifier_type):
             # Transform instance through pipeline steps (except the final estimator)
-            instance_transformed = instance_df
+            # Convert to numpy array first to avoid sklearn feature name warnings
+            instance_transformed = instance_df.values if isinstance(instance_df, pd.DataFrame) else instance_df
             for step_name, step_transformer in model.steps[:-1]:
                 instance_transformed = step_transformer.transform(instance_transformed)
             shap_values = explainer(instance_transformed)
@@ -147,13 +148,18 @@ def _create_shap_explainer(model, model_key: str, classifier_type: str, final_es
             # But we need to transform the background data through the pipeline steps first
             if isinstance(model, Pipeline):
                 # Transform background data through pipeline steps (except the final estimator)
-                X_transformed = X_background
+                # Keep as numpy array for LinearExplainer (it doesn't need feature names)
+                X_transformed = X_background.values if isinstance(X_background, pd.DataFrame) else X_background
                 for step_name, step_transformer in model.steps[:-1]:
                     X_transformed = step_transformer.transform(X_transformed)
+                # LinearExplainer works best with numpy arrays
+                if isinstance(X_transformed, pd.DataFrame):
+                    X_transformed = X_transformed.values
                 # Use the transformed data and final estimator for LinearExplainer
                 explainer = shap.LinearExplainer(final_estimator, X_transformed)
             else:
-                explainer = shap.LinearExplainer(model, X_background)
+                X_bg = X_background.values if isinstance(X_background, pd.DataFrame) else X_background
+                explainer = shap.LinearExplainer(model, X_bg)
         else:
             # Fallback to KernelExplainer (slower but works for any model)
             # This works with the full pipeline
