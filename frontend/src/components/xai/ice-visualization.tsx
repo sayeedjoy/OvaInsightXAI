@@ -61,7 +61,7 @@ export function ICEVisualization({ explanation }: ICEVisualizationProps) {
                 },
                 name: `Sample ${curve.sample_index + 1}`,
                 emphasis: {
-                    focus: "series",
+                    focus: "series" as const,
                     lineStyle: {
                         width: 2.5,
                         opacity: 1,

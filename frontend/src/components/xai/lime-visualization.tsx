@@ -101,7 +101,7 @@ export function LIMEVisualization({ explanation }: LIMEVisualizationProps) {
                 },
                 formatter: (params) => {
                     const param = Array.isArray(params) ? params[0] : params
-                    const data = param.data as typeof data[number]
+                    const data = param.data as { value: number; feature: string }
                     return `
                         <div style="margin: 4px 0;">
                             <strong>${data.feature}</strong>
