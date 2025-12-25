@@ -19,8 +19,6 @@ import {
     CardTitle
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { XAIContainer } from "@/components/xai"
-import type { XAIResponse } from "@/types/xai"
 
 export type PredictionResult = {
     prediction: number | string
@@ -200,22 +198,6 @@ export function PredictionResultCard({
                                     </div>
                                 </div>
                             </div>
-                        )}
-
-                        {/* XAI Explanations */}
-                        {result.xai && (
-                            <>
-                                <Separator className="hidden sm:block" />
-                                <div className="space-y-3 sm:space-y-4">
-                                    <div className="flex items-center gap-2">
-                                        <BarChart3 className="h-4 w-4 text-muted-foreground sm:h-5 sm:w-5" />
-                                        <h3 className="text-sm font-medium sm:text-base">Model Explanations</h3>
-                                    </div>
-                                    <div className="rounded-lg border border-border bg-muted/30 p-4">
-                                        <XAIContainer xaiData={result.xai} />
-                                    </div>
-                                </div>
-                            </>
                         )}
 
                         {/* Disclaimer */}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { BarChart3 } from "lucide-react"
 
 import {
     HepatitisPredictionForm,
@@ -13,6 +14,8 @@ import {
     PredictionResultCard,
     type PredictionResult
 } from "@/components/prediction-components"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { XAIContainer } from "@/components/xai"
 import {
     generateHepatitisNegativeTestCase,
     generateHepatitisPositiveTestCase
@@ -150,6 +153,25 @@ export default function HepatitisPredictPage() {
                         conditionName="Hepatitis B"
                     />
                 </div>
+
+                {/* Model Explanations Section */}
+                {result?.xai && (
+                    <div className="mt-6 lg:mt-10">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center gap-2">
+                                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                                    <CardTitle className="text-lg font-semibold sm:text-xl">
+                                        Model Explanations
+                                    </CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <XAIContainer xaiData={result.xai} />
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
             </div>
         </>
     )
