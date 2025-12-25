@@ -7,8 +7,13 @@ WORKDIR /app
 ARG BUILD_VERSION=v2
 
 # Install system dependencies for Python packages that need compilation
+# SHAP requires libgomp1, libgcc-s1, and g++ for C++ extensions
 RUN apt-get update && apt-get install -y \
     gcc \
+    g++ \
+    libgomp1 \
+    libgcc-s1 \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies

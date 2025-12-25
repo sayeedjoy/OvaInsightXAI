@@ -26,7 +26,7 @@ def _get_model_and_features(model_key: str, instance_features: list[float]) -> t
     return model, instance_array
 
 
-def _generate_training_data(model_key: str, n_samples: int = 2000, return_dataframe: bool = False) -> tuple[np.ndarray | pd.DataFrame, np.ndarray]:
+def _generate_training_data(model_key: str, n_samples: int = 1000, return_dataframe: bool = False) -> tuple[np.ndarray | pd.DataFrame, np.ndarray]:
     """Generate synthetic training data for XAI methods that need background data.
     
     Args:
@@ -136,14 +136,18 @@ def _generate_training_data(model_key: str, n_samples: int = 2000, return_datafr
 def compute_shap_explanation(
     model_key: str,
     instance_features: list[float],
-    background_samples: int = 100
+    background_samples: int = 50
 ) -> dict[str, Any]:
     """Compute SHAP values for the prediction."""
     try:
         import shap
-    except ImportError:
-        logger.error("SHAP library not available")
-        return {"error": "SHAP library not installed"}
+        logger.debug("SHAP library imported successfully")
+    except ImportError as exc:
+        logger.error("SHAP library not available: %s", exc, exc_info=True)
+        return {"error": "SHAP library not installed", "error_type": "ImportError", "details": str(exc)}
+    except Exception as exc:
+        logger.error("Unexpected error importing SHAP: %s", exc, exc_info=True)
+        return {"error": f"Failed to import SHAP: {str(exc)}", "error_type": type(exc).__name__, "details": str(exc)}
 
     try:
         model, instance_array = _get_model_and_features(model_key, instance_features)
@@ -166,28 +170,64 @@ def compute_shap_explanation(
             final_estimator = model
             classifier_type = type(model).__name__
 
-        # Use appropriate explainer
+        # Use appropriate explainer with fallback strategy for ovarian model
         # For TreeExplainer and LinearExplainer, we need to use the pipeline for predictions
         # but can use the final estimator for explainer initialization
-        if "Tree" in classifier_type or "XGB" in classifier_type or "LGBM" in classifier_type:
-            # TreeExplainer can work with the pipeline directly
-            explainer = shap.TreeExplainer(model, X_background)
-        elif "Linear" in classifier_type or "Logistic" in classifier_type:
-            # LinearExplainer needs the actual estimator, not the pipeline
-            # But we need to transform the background data through the pipeline steps first
-            if isinstance(model, Pipeline):
-                # Transform background data through pipeline steps (except the final estimator)
-                X_transformed = X_background
-                for step_name, step_transformer in model.steps[:-1]:
-                    X_transformed = step_transformer.transform(X_transformed)
-                # Use the transformed data and final estimator for LinearExplainer
-                explainer = shap.LinearExplainer(final_estimator, X_transformed)
+        explainer = None
+        explainer_error = None
+        
+        try:
+            if "Tree" in classifier_type or "XGB" in classifier_type or "LGBM" in classifier_type:
+                # TreeExplainer can work with the pipeline directly
+                # For ovarian model, try with smaller background sample if it fails
+                try:
+                    explainer = shap.TreeExplainer(model, X_background)
+                except Exception as tree_exc:
+                    logger.warning("TreeExplainer failed for %s, trying with smaller background: %s", model_key, tree_exc)
+                    # Try with smaller background for ovarian model
+                    if model_key == "ovarian" and len(X_background) > 30:
+                        if isinstance(X_background, pd.DataFrame):
+                            X_background_small = X_background.sample(n=30, random_state=42)
+                        else:
+                            X_background_small = X_background[:30]
+                        explainer = shap.TreeExplainer(model, X_background_small)
+                    else:
+                        raise tree_exc
+            elif "Linear" in classifier_type or "Logistic" in classifier_type:
+                # LinearExplainer needs the actual estimator, not the pipeline
+                # But we need to transform the background data through the pipeline steps first
+                if isinstance(model, Pipeline):
+                    # Transform background data through pipeline steps (except the final estimator)
+                    X_transformed = X_background
+                    for step_name, step_transformer in model.steps[:-1]:
+                        X_transformed = step_transformer.transform(X_transformed)
+                    # Use the transformed data and final estimator for LinearExplainer
+                    explainer = shap.LinearExplainer(final_estimator, X_transformed)
+                else:
+                    explainer = shap.LinearExplainer(model, X_background)
             else:
-                explainer = shap.LinearExplainer(model, X_background)
-        else:
-            # Fallback to KernelExplainer (slower but works for any model)
-            # This works with the full pipeline
-            explainer = shap.KernelExplainer(model.predict_proba, X_background)
+                # Fallback to KernelExplainer (slower but works for any model)
+                # This works with the full pipeline
+                explainer = shap.KernelExplainer(model.predict_proba, X_background)
+        except Exception as exc:
+            explainer_error = exc
+            logger.warning("Primary explainer failed for %s: %s, trying KernelExplainer fallback", model_key, exc)
+            # Fallback to KernelExplainer for any model that fails with other explainers
+            try:
+                # Use smaller background for KernelExplainer to improve performance
+                sample_size = min(50, len(X_background))
+                if isinstance(X_background, pd.DataFrame):
+                    X_background_small = X_background.sample(n=sample_size, random_state=42)
+                else:
+                    X_background_small = X_background[:sample_size]
+                explainer = shap.KernelExplainer(model.predict_proba, X_background_small)
+                logger.info("Using KernelExplainer fallback for %s", model_key)
+            except Exception as fallback_exc:
+                logger.error("KernelExplainer fallback also failed for %s: %s", model_key, fallback_exc)
+                raise fallback_exc
+        
+        if explainer is None:
+            raise RuntimeError(f"Failed to create explainer for {model_key}: {explainer_error}")
 
         # For LinearExplainer with Pipeline, we need to transform the instance too
         if isinstance(model, Pipeline) and ("Linear" in classifier_type or "Logistic" in classifier_type):
@@ -301,9 +341,21 @@ def compute_shap_explanation(
             "contributions": contributions,
             "prediction": float(model.predict_proba(instance_array)[0][1]) if hasattr(model, "predict_proba") else None,
         }
+    except ImportError as exc:
+        logger.error("SHAP import error during computation for %s: %s", model_key, exc, exc_info=True)
+        return {"error": f"SHAP import failed: {str(exc)}", "error_type": "ImportError", "details": str(exc)}
+    except OSError as exc:
+        logger.error("SHAP system library error for %s (missing system dependencies?): %s", model_key, exc, exc_info=True)
+        return {"error": f"SHAP system library error: {str(exc)}", "error_type": "OSError", "details": str(exc)}
+    except RuntimeError as exc:
+        logger.error("SHAP runtime error for %s: %s", model_key, exc, exc_info=True)
+        return {"error": f"SHAP runtime error: {str(exc)}", "error_type": "RuntimeError", "details": str(exc)}
+    except MemoryError as exc:
+        logger.error("SHAP memory error for %s (insufficient memory): %s", model_key, exc, exc_info=True)
+        return {"error": f"SHAP memory error: {str(exc)}", "error_type": "MemoryError", "details": str(exc)}
     except Exception as exc:
-        logger.error("Error computing SHAP explanation: %s", exc, exc_info=True)
-        return {"error": str(exc)}
+        logger.error("Error computing SHAP explanation for %s: %s (type: %s)", model_key, exc, type(exc).__name__, exc_info=True)
+        return {"error": str(exc), "error_type": type(exc).__name__, "details": str(exc)}
 
 
 def compute_lime_explanation(
@@ -314,16 +366,21 @@ def compute_lime_explanation(
     """Compute LIME explanation for the prediction."""
     try:
         from lime import lime_tabular
-    except ImportError:
-        logger.error("LIME library not available")
-        return {"error": "LIME library not installed"}
+        logger.debug("LIME library imported successfully")
+    except ImportError as exc:
+        logger.error("LIME library not available: %s", exc, exc_info=True)
+        return {"error": "LIME library not installed", "error_type": "ImportError", "details": str(exc)}
+    except Exception as exc:
+        logger.error("Unexpected error importing LIME: %s", exc, exc_info=True)
+        return {"error": f"Failed to import LIME: {str(exc)}", "error_type": type(exc).__name__, "details": str(exc)}
 
     try:
         model, instance_array = _get_model_and_features(model_key, instance_features)
         config = MODEL_REGISTRY[model_key]
 
         # Generate training data for LIME (as numpy array - LIME expects arrays)
-        X_train, _ = _generate_training_data(model_key, n_samples=1000, return_dataframe=False)
+        # Reduced from 1000 to 500 for better performance
+        X_train, _ = _generate_training_data(model_key, n_samples=500, return_dataframe=False)
 
         # Create LIME explainer
         explainer = lime_tabular.LimeTabularExplainer(
@@ -355,9 +412,21 @@ def compute_lime_explanation(
             "feature_importance": feature_importance,
             "prediction": float(model.predict_proba(instance_array)[0][1]) if hasattr(model, "predict_proba") else None,
         }
+    except ImportError as exc:
+        logger.error("LIME import error during computation for %s: %s", model_key, exc, exc_info=True)
+        return {"error": f"LIME import failed: {str(exc)}", "error_type": "ImportError", "details": str(exc)}
+    except OSError as exc:
+        logger.error("LIME system library error for %s (missing system dependencies?): %s", model_key, exc, exc_info=True)
+        return {"error": f"LIME system library error: {str(exc)}", "error_type": "OSError", "details": str(exc)}
+    except RuntimeError as exc:
+        logger.error("LIME runtime error for %s: %s", model_key, exc, exc_info=True)
+        return {"error": f"LIME runtime error: {str(exc)}", "error_type": "RuntimeError", "details": str(exc)}
+    except MemoryError as exc:
+        logger.error("LIME memory error for %s (insufficient memory): %s", model_key, exc, exc_info=True)
+        return {"error": f"LIME memory error: {str(exc)}", "error_type": "MemoryError", "details": str(exc)}
     except Exception as exc:
-        logger.error("Error computing LIME explanation: %s", exc, exc_info=True)
-        return {"error": str(exc)}
+        logger.error("Error computing LIME explanation for %s: %s (type: %s)", model_key, exc, type(exc).__name__, exc_info=True)
+        return {"error": str(exc), "error_type": type(exc).__name__, "details": str(exc)}
 
 
 def compute_pdp_1d(
@@ -370,8 +439,8 @@ def compute_pdp_1d(
         model, _ = _get_model_and_features(model_key, [0.0] * len(MODEL_REGISTRY[model_key].feature_order))
         config = MODEL_REGISTRY[model_key]
 
-        # Generate background data
-        X_background, _ = _generate_training_data(model_key, n_samples=500)
+        # Generate background data (reduced from 500 to 300 for better performance)
+        X_background, _ = _generate_training_data(model_key, n_samples=300)
 
         feature_names = config.feature_order
         results = []
@@ -481,8 +550,8 @@ def compute_ale_1d(
         model, _ = _get_model_and_features(model_key, [0.0] * len(MODEL_REGISTRY[model_key].feature_order))
         config = MODEL_REGISTRY[model_key]
 
-        # Generate background data
-        X_background, _ = _generate_training_data(model_key, n_samples=500)
+        # Generate background data (reduced from 500 to 300 for better performance)
+        X_background, _ = _generate_training_data(model_key, n_samples=300)
 
         feature_names = config.feature_order
         results = []

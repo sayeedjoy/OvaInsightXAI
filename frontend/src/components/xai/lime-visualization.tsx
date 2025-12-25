@@ -101,13 +101,17 @@ export function LIMEVisualization({ explanation }: LIMEVisualizationProps) {
                 },
                 formatter: (params) => {
                     const param = Array.isArray(params) ? params[0] : params
-                    const data = param.data as { value: number; feature: string }
+                    // ECharts passes data in param.data for bar charts
+                    const dataPoint = param.data as { value: number; feature?: string }
+                    const featureName = dataPoint?.feature || param.name || "Unknown"
+                    const importance = dataPoint?.value ?? param.value ?? 0
+                    
                     return `
                         <div style="margin: 4px 0;">
-                            <strong>${data.feature}</strong>
+                            <strong>${featureName}</strong>
                         </div>
                         <div style="margin: 4px 0;">
-                            Importance: <code>${data.value.toFixed(4)}</code>
+                            Importance: <code>${typeof importance === "number" ? importance.toFixed(4) : importance}</code>
                         </div>
                     `
                 },
@@ -117,6 +121,7 @@ export function LIMEVisualization({ explanation }: LIMEVisualizationProps) {
                     type: "bar",
                     data: data.map((d) => ({
                         value: d.value,
+                        feature: d.feature,
                         itemStyle: {
                             color: d.value >= 0 ? theme.positiveColor : theme.negativeColor,
                         },
