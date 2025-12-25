@@ -9,7 +9,9 @@ import {
     NavigationMenu,
     NavigationMenuItem,
     NavigationMenuLink,
-    NavigationMenuList
+    NavigationMenuList,
+    NavigationMenuTrigger,
+    NavigationMenuContent
 } from "../ui/navigation-menu"
 import { Separator } from "../ui/separator"
 import {
@@ -26,6 +28,15 @@ interface RouteProps {
     label: string
 }
 
+interface ModelMenuProps {
+    href: string
+    label: string
+    logo: string
+    color: string
+    hoverColor: string
+    bgColor: string
+}
+
 const routeList: RouteProps[] = [
     {
         href: "/",
@@ -38,6 +49,33 @@ const routeList: RouteProps[] = [
     {
         href: "#contact",
         label: "Contact"
+    }
+]
+
+const modelMenuList: ModelMenuProps[] = [
+    {
+        href: "/ovarian",
+        label: "Ovarian",
+        logo: "/model-ova.webp",
+        color: "text-primary",
+        hoverColor: "hover:text-primary",
+        bgColor: "hover:bg-primary/10"
+    },
+    {
+        href: "/hepatitis",
+        label: "Hepatitis",
+        logo: "/model-hepa.webp",
+        color: "text-green-600 dark:text-green-400",
+        hoverColor: "hover:text-green-600 dark:hover:text-green-400",
+        bgColor: "hover:bg-green-600/10 dark:hover:bg-green-400/10"
+    },
+    {
+        href: "/pcos",
+        label: "PCOS",
+        logo: "/model-pcos.webp",
+        color: "text-amber-600 dark:text-amber-400",
+        hoverColor: "hover:text-amber-600 dark:hover:text-amber-400",
+        bgColor: "hover:bg-amber-600/10 dark:hover:bg-amber-400/10"
     }
 ]
 
@@ -70,7 +108,43 @@ export const Navbar = () => {
                     <div className="hidden items-center space-x-1 lg:flex">
                         <NavigationMenu>
                             <NavigationMenuList className="space-x-2">
-                                {routeList.map(({ href, label }) => (
+                                <NavigationMenuItem key={routeList[0].href}>
+                                    <NavigationMenuLink asChild>
+                                        <Link
+                                            href={routeList[0].href}
+                                            className="rounded-lg px-4 py-2 font-medium text-sm transition-colors hover:bg-accent/50 hover:text-primary"
+                                        >
+                                            {routeList[0].label}
+                                        </Link>
+                                    </NavigationMenuLink>
+                                </NavigationMenuItem>
+                                <NavigationMenuItem>
+                                    <NavigationMenuTrigger className="rounded-lg px-4 py-2 font-medium text-sm transition-colors hover:bg-accent/50 hover:text-primary">
+                                        Models
+                                    </NavigationMenuTrigger>
+                                    <NavigationMenuContent>
+                                        <div className="w-[200px] p-2">
+                                            {modelMenuList.map(({ href, label, logo, color, hoverColor, bgColor }) => (
+                                                <NavigationMenuLink key={href} asChild>
+                                                    <Link
+                                                        href={href}
+                                                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${bgColor}`}
+                                                    >
+                                                        <Image
+                                                            src={logo}
+                                                            alt={label}
+                                                            width={24}
+                                                            height={24}
+                                                            className="object-contain"
+                                                        />
+                                                        <span className={`${color} ${hoverColor}`}>{label}</span>
+                                                    </Link>
+                                                </NavigationMenuLink>
+                                            ))}
+                                        </div>
+                                    </NavigationMenuContent>
+                                </NavigationMenuItem>
+                                {routeList.slice(1).map(({ href, label }) => (
                                     <NavigationMenuItem key={href}>
                                         <NavigationMenuLink asChild>
                                             <Link
@@ -140,7 +214,47 @@ export const Navbar = () => {
                                     {/* Mobile Navigation Links */}
                                     <div className="flex flex-1 flex-col">
                                         <div className="space-y-1">
-                                            {routeList.map(
+                                            <Button
+                                                key={routeList[0].href}
+                                                onClick={() =>
+                                                    setIsOpen(false)
+                                                }
+                                                asChild
+                                                variant="ghost"
+                                                className="h-auto w-full justify-start px-3 py-2.5 font-medium hover:bg-accent/50"
+                                            >
+                                                <Link href={routeList[0].href}>
+                                                    {routeList[0].label}
+                                                </Link>
+                                            </Button>
+                                            <div className="px-3 py-2 text-sm font-semibold text-muted-foreground">
+                                                Models
+                                            </div>
+                                            {modelMenuList.map(
+                                                ({ href, label, logo, color, hoverColor, bgColor }) => (
+                                                    <Button
+                                                        key={href}
+                                                        onClick={() =>
+                                                            setIsOpen(false)
+                                                        }
+                                                        asChild
+                                                        variant="ghost"
+                                                        className={`h-auto w-full justify-start gap-3 px-3 py-2.5 font-medium ${bgColor}`}
+                                                    >
+                                                        <Link href={href}>
+                                                            <Image
+                                                                src={logo}
+                                                                alt={label}
+                                                                width={24}
+                                                                height={24}
+                                                                className="object-contain"
+                                                            />
+                                                            <span className={`${color} ${hoverColor}`}>{label}</span>
+                                                        </Link>
+                                                    </Button>
+                                                )
+                                            )}
+                                            {routeList.slice(1).map(
                                                 ({ href, label }) => (
                                                     <Button
                                                         key={href}
