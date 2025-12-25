@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from sklearn.inspection import partial_dependence
 
 from app.model import predictor
@@ -25,10 +26,17 @@ def _get_model_and_features(model_key: str, instance_features: list[float]) -> t
     return model, instance_array
 
 
-def _generate_training_data(model_key: str, n_samples: int = 2000) -> tuple[np.ndarray, np.ndarray]:
-    """Generate synthetic training data for XAI methods that need background data."""
-    if model_key in _TRAINING_DATA_CACHE:
-        return _TRAINING_DATA_CACHE[model_key]
+def _generate_training_data(model_key: str, n_samples: int = 2000, return_dataframe: bool = False) -> tuple[np.ndarray | pd.DataFrame, np.ndarray]:
+    """Generate synthetic training data for XAI methods that need background data.
+    
+    Args:
+        model_key: The model key to generate data for
+        n_samples: Number of samples to generate
+        return_dataframe: If True, return pandas DataFrame with feature names instead of numpy array
+    """
+    cache_key = f"{model_key}_{return_dataframe}"
+    if cache_key in _TRAINING_DATA_CACHE:
+        return _TRAINING_DATA_CACHE[cache_key]
 
     config = MODEL_REGISTRY[model_key]
     feature_order = config.feature_order
@@ -115,8 +123,14 @@ def _generate_training_data(model_key: str, n_samples: int = 2000) -> tuple[np.n
     else:
         y = np.random.binomial(1, 0.3, n_samples)
 
-    _TRAINING_DATA_CACHE[model_key] = (X, y)
-    return X, y
+    # Convert to DataFrame with feature names if requested
+    if return_dataframe:
+        X_df = pd.DataFrame(X, columns=feature_order)
+        _TRAINING_DATA_CACHE[cache_key] = (X_df, y)
+        return X_df, y
+    else:
+        _TRAINING_DATA_CACHE[cache_key] = (X, y)
+        return X, y
 
 
 def compute_shap_explanation(
@@ -135,8 +149,11 @@ def compute_shap_explanation(
         model, instance_array = _get_model_and_features(model_key, instance_features)
         config = MODEL_REGISTRY[model_key]
 
-        # Get background data
-        X_background, _ = _generate_training_data(model_key, n_samples=background_samples)
+        # Get background data as DataFrame with feature names to avoid sklearn warnings
+        X_background, _ = _generate_training_data(model_key, n_samples=background_samples, return_dataframe=True)
+        
+        # Convert instance to DataFrame with feature names
+        instance_df = pd.DataFrame(instance_array, columns=config.feature_order)
 
         # Extract the final estimator from Pipeline if needed
         from sklearn.pipeline import Pipeline
@@ -175,29 +192,90 @@ def compute_shap_explanation(
         # For LinearExplainer with Pipeline, we need to transform the instance too
         if isinstance(model, Pipeline) and ("Linear" in classifier_type or "Logistic" in classifier_type):
             # Transform instance through pipeline steps (except the final estimator)
-            instance_transformed = instance_array
+            instance_transformed = instance_df
             for step_name, step_transformer in model.steps[:-1]:
                 instance_transformed = step_transformer.transform(instance_transformed)
             shap_values = explainer(instance_transformed)
         else:
-            # For other explainers, use the original instance array
-            shap_values = explainer(instance_array)
+            # For other explainers, use the DataFrame with feature names
+            shap_values = explainer(instance_df)
 
         # Extract values
+        import numpy as np
+        
         if hasattr(shap_values, "values"):
-            values = shap_values.values[0]
-            base_value = float(shap_values.base_values[0]) if hasattr(shap_values, "base_values") else None
+            values = shap_values.values[0] if hasattr(shap_values.values, "__getitem__") else shap_values.values
+            
+            # Handle base_values - it might be an array or scalar
+            if hasattr(shap_values, "base_values"):
+                base_values = shap_values.base_values
+                try:
+                    # Check if base_values[0] exists and what type it is
+                    if isinstance(base_values, np.ndarray):
+                        if base_values.ndim == 0:
+                            # Scalar array
+                            base_value = float(base_values.item())
+                        elif base_values.ndim == 1:
+                            # 1D array: [base_0, base_1] for binary classification
+                            # Take the positive class base value (index 1) if available, else index 0
+                            base_value = float(base_values[1] if len(base_values) > 1 else base_values[0])
+                        else:
+                            # Multi-dimensional array, get first element and check if it's an array
+                            first_elem = base_values[0]
+                            if isinstance(first_elem, np.ndarray):
+                                # Nested array case
+                                if first_elem.size == 1:
+                                    base_value = float(first_elem.item())
+                                else:
+                                    base_value = float(first_elem[1] if len(first_elem) > 1 else first_elem[0])
+                            else:
+                                base_value = float(first_elem)
+                    elif isinstance(base_values, (list, tuple)):
+                        if len(base_values) > 0:
+                            first_elem = base_values[0]
+                            if isinstance(first_elem, (list, tuple, np.ndarray)):
+                                base_value = float(first_elem[1] if len(first_elem) > 1 else first_elem[0])
+                            else:
+                                base_value = float(base_values[1] if len(base_values) > 1 else first_elem)
+                        else:
+                            base_value = None
+                    else:
+                        # Scalar
+                        base_value = float(base_values) if base_values is not None else None
+                except (IndexError, TypeError, ValueError) as exc:
+                    logger.warning("Could not extract base_value: %s", exc)
+                    base_value = None
+            else:
+                base_value = None
         else:
             # For KernelExplainer or when shap_values is a list
             if isinstance(shap_values, list) and len(shap_values) > 0:
-                values = shap_values[0].values if hasattr(shap_values[0], "values") else shap_values[0]
-                base_value = float(shap_values[0].base_values) if hasattr(shap_values[0], "base_values") else None
+                first_item = shap_values[0]
+                if hasattr(first_item, "values"):
+                    values = first_item.values[0] if hasattr(first_item.values, "__getitem__") else first_item.values
+                else:
+                    values = first_item
+                    
+                if hasattr(first_item, "base_values"):
+                    base_vals = first_item.base_values
+                    if isinstance(base_vals, np.ndarray):
+                        base_value = float(base_vals[1] if len(base_vals) > 1 else base_vals[0])
+                    else:
+                        base_value = float(base_vals[1] if isinstance(base_vals, (list, tuple)) and len(base_vals) > 1 else base_vals[0] if isinstance(base_vals, (list, tuple)) else base_vals) if base_vals is not None else None
+                else:
+                    base_value = None
             else:
                 values = shap_values.values if hasattr(shap_values, "values") else shap_values
-                base_value = float(shap_values.base_values) if hasattr(shap_values, "base_values") else None
+                if hasattr(shap_values, "base_values"):
+                    base_vals = shap_values.base_values
+                    if isinstance(base_vals, np.ndarray):
+                        base_value = float(base_vals[1] if len(base_vals) > 1 else base_vals[0])
+                    else:
+                        base_value = float(base_vals[1] if isinstance(base_vals, (list, tuple)) and len(base_vals) > 1 else base_vals[0] if isinstance(base_vals, (list, tuple)) else base_vals) if base_vals is not None else None
+                else:
+                    base_value = None
 
         # Ensure values is a numpy array
-        import numpy as np
         if not isinstance(values, np.ndarray):
             values = np.array(values)
 
@@ -244,8 +322,8 @@ def compute_lime_explanation(
         model, instance_array = _get_model_and_features(model_key, instance_features)
         config = MODEL_REGISTRY[model_key]
 
-        # Generate training data for LIME
-        X_train, _ = _generate_training_data(model_key, n_samples=1000)
+        # Generate training data for LIME (as numpy array - LIME expects arrays)
+        X_train, _ = _generate_training_data(model_key, n_samples=1000, return_dataframe=False)
 
         # Create LIME explainer
         explainer = lime_tabular.LimeTabularExplainer(
