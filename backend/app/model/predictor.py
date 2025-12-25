@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Iterable, NamedTuple, Sequence, Union
 
 import numpy as np
+import pandas as pd
 
 from app.model.registry import MODEL_REGISTRY, ModelConfig
 from app.utils.config import MODEL_PATH, validate_feature_iterable
@@ -70,6 +71,40 @@ def _get_model_feature_count(model: Any) -> int | None:
         return int(n) if n is not None else None
     except Exception:
         return None
+
+
+def _get_model_feature_names(model: Any) -> list[str] | None:
+    """
+    Try to get the feature names the model expects.
+    
+    Models trained with pandas DataFrames store feature names in `feature_names_in_`.
+    For Pipeline objects, we check the Pipeline first, then the final estimator.
+    """
+    try:
+        from sklearn.pipeline import Pipeline
+        
+        # For Pipeline objects, check the Pipeline's feature_names_in_ first
+        if isinstance(model, Pipeline):
+            # Pipelines may have feature_names_in_ at the pipeline level
+            pipeline_feature_names = getattr(model, "feature_names_in_", None)
+            if pipeline_feature_names is not None:
+                return list(pipeline_feature_names)
+            
+            # Otherwise, check the final estimator
+            if hasattr(model, "steps") and len(model.steps) > 0:
+                final_estimator = model.steps[-1][1]
+                final_feature_names = getattr(final_estimator, "feature_names_in_", None)
+                if final_feature_names is not None:
+                    return list(final_feature_names)
+        
+        # For direct estimators, check feature_names_in_
+        feature_names = getattr(model, "feature_names_in_", None)
+        if feature_names is not None:
+            return list(feature_names)
+    except Exception as exc:
+        logger.debug("Error getting model feature names: %s", exc)
+    
+    return None
 
 
 def _validate_model_feature_count(model: Any, *, model_path: Path, config: ModelConfig) -> None:
@@ -764,11 +799,42 @@ def predict(features: Sequence[float], *, model_key: str = _DEFAULT_MODEL_KEY) -
     # Convert to numpy array with proper shape: (n_samples, n_features)
     # Most sklearn-style estimators expect a 2D array: (n_samples, n_features)
     try:
-        batch = np.array(vector).reshape(1, -1)
-        logger.debug("Batch shape: %s, dtype: %s", batch.shape, batch.dtype)
+        batch_array = np.array(vector).reshape(1, -1)
+        logger.debug("Batch shape: %s, dtype: %s", batch_array.shape, batch_array.dtype)
     except Exception as exc:
         logger.error("Failed to create numpy array from features: %s", exc, exc_info=True)
         raise ValueError(f"Failed to prepare feature array: {str(exc)}") from exc
+    
+    # Convert to pandas DataFrame with feature names to avoid sklearn warnings
+    # about feature name mismatches when models were trained with named features
+    # Use the model's expected feature names if available, otherwise use registry names
+    try:
+        model = _MODELS[model_key]
+        model_feature_names = _get_model_feature_names(model)
+        
+        if model_feature_names is not None:
+            # Use the feature names the model expects
+            if len(model_feature_names) != len(batch_array[0]):
+                logger.warning(
+                    "Model feature names count (%d) doesn't match feature vector length (%d). "
+                    "Falling back to numpy array.",
+                    len(model_feature_names), len(batch_array[0])
+                )
+                batch = batch_array
+            else:
+                feature_names_to_use = model_feature_names
+                logger.debug("Using model's expected feature names: %s", feature_names_to_use[:5])  # Log first 5
+                batch = pd.DataFrame(batch_array, columns=feature_names_to_use)
+                logger.debug("Converted to DataFrame with %d columns", len(batch.columns))
+        else:
+            # Model doesn't expose feature_names_in_ - try using registry names
+            # but be prepared to fall back to numpy array if it fails
+            logger.debug("Model doesn't expose feature_names_in_, trying registry feature names")
+            batch = pd.DataFrame(batch_array, columns=config.feature_order)
+            logger.debug("Converted to DataFrame with registry feature names: %s", list(batch.columns)[:5])
+    except Exception as exc:
+        logger.warning("Failed to convert to DataFrame with feature names: %s. Falling back to numpy array.", exc)
+        batch = batch_array
     
     # #region agent log
     try:
@@ -778,7 +844,8 @@ def predict(features: Sequence[float], *, model_key: str = _DEFAULT_MODEL_KEY) -
         runtime_sklearn = "unknown"
     try:
         with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:before_predict", "message": "Before prediction", "data": {"model_key": model_key, "model_type": str(type(_MODELS[model_key])), "runtime_sklearn": runtime_sklearn, "batch_shape": list(batch.shape), "supports_proba": _SUPPORTS_PROBA[model_key]}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            batch_shape = list(batch.shape) if hasattr(batch, "shape") else "unknown"
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "predictor.py:predict:before_predict", "message": "Before prediction", "data": {"model_key": model_key, "model_type": str(type(_MODELS[model_key])), "runtime_sklearn": runtime_sklearn, "batch_shape": batch_shape, "supports_proba": _SUPPORTS_PROBA[model_key]}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
     except Exception:  # pragma: no cover - debug logging only
         pass
     # #endregion
@@ -811,7 +878,9 @@ def predict(features: Sequence[float], *, model_key: str = _DEFAULT_MODEL_KEY) -
         raise
     except Exception as exc:
         logger.error("Unexpected error during model prediction: %s", exc, exc_info=True)
-        logger.error("Model type: %s, Batch shape: %s, Batch dtype: %s", type(_MODELS[model_key]).__name__, batch.shape, batch.dtype)
+        batch_shape = batch.shape if hasattr(batch, "shape") else "unknown"
+        batch_dtype = batch.dtype if hasattr(batch, "dtype") else "unknown"
+        logger.error("Model type: %s, Batch shape: %s, Batch dtype: %s", type(_MODELS[model_key]).__name__, batch_shape, batch_dtype)
         raise ValueError(f"Model prediction failed: {str(exc)}") from exc
     
     confidence = None
