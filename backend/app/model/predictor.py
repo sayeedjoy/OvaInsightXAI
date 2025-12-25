@@ -742,6 +742,13 @@ def ensure_model_loaded(model_key: str = _DEFAULT_MODEL_KEY) -> None:
     )
 
 
+def get_model(model_key: str = _DEFAULT_MODEL_KEY) -> Any:
+    """Get the loaded model for a given key."""
+    if model_key not in _MODELS:
+        raise RuntimeError("Model has not been loaded yet. Call ensure_model_loaded().")
+    return _MODELS[model_key]
+
+
 def predict(features: Sequence[float], *, model_key: str = _DEFAULT_MODEL_KEY) -> PredictionResult:
     """Run inference on a single vector of features."""
     if model_key not in _MODELS:

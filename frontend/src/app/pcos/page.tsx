@@ -106,7 +106,8 @@ export default function PcosPredictPage() {
 
             setResult({
                 prediction: data.prediction,
-                confidence: data.confidence ?? null
+                confidence: data.confidence ?? null,
+                xai: data.xai ?? null
             })
         } catch (fetchError) {
             const message =

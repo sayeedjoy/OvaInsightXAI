@@ -1,6 +1,6 @@
 """Pydantic schemas shared across the API."""
 
-from typing import Union
+from typing import Any, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,6 +29,7 @@ class PredictionResponse(BaseModel):
 
     prediction: Union[int, float]
     confidence: float | None = None
+    xai: dict[str, Any] | None = None
 
 
 class HealthResponse(BaseModel):
@@ -84,4 +85,102 @@ class PcosRequest(BaseModel):
     follicle_no_right: float = Field(..., alias="Follicle No. (R)", description="Follicle count right")
     hip_inch: float = Field(..., alias="Hip(inch)", description="Hip in inches")
     waist_inch: float = Field(..., alias="Waist(inch)", description="Waist in inches")
+
+
+# XAI Explanation Schemas
+class SHAPContribution(BaseModel):
+    """SHAP contribution for a single feature."""
+
+    feature: str
+    value: float
+    shap_value: float
+
+
+class SHAPExplanation(BaseModel):
+    """SHAP explanation response."""
+
+    base_value: float | None = None
+    contributions: list[SHAPContribution]
+    prediction: float | None = None
+    error: str | None = None
+
+
+class LIMEFeatureImportance(BaseModel):
+    """LIME feature importance for a single feature."""
+
+    feature: str
+    importance: float
+
+
+class LIMEExplanation(BaseModel):
+    """LIME explanation response."""
+
+    feature_importance: list[LIMEFeatureImportance]
+    prediction: float | None = None
+    error: str | None = None
+
+
+class PDP1DPlot(BaseModel):
+    """1D Partial Dependence Plot data."""
+
+    feature: str
+    feature_index: int
+    grid_values: list[float]
+    predictions: list[float]
+
+
+class PDP1DResponse(BaseModel):
+    """1D PDP response."""
+
+    pdp_plots: list[PDP1DPlot]
+    error: str | None = None
+
+
+class ICE1DCurve(BaseModel):
+    """Individual curve in ICE plot."""
+
+    sample_index: int
+    predictions: list[float]
+
+
+class ICE1DPlot(BaseModel):
+    """1D Individual Conditional Expectation plot data."""
+
+    feature: str
+    feature_index: int
+    grid_values: list[float]
+    curves: list[ICE1DCurve]
+
+
+class ICE1DResponse(BaseModel):
+    """1D ICE response."""
+
+    ice_plots: list[ICE1DPlot]
+    error: str | None = None
+
+
+class ALE1DPlot(BaseModel):
+    """1D Accumulated Local Effects plot data."""
+
+    feature: str
+    feature_index: int
+    bin_centers: list[float]
+    ale_values: list[float]
+
+
+class ALE1DResponse(BaseModel):
+    """1D ALE response."""
+
+    ale_plots: list[ALE1DPlot]
+    error: str | None = None
+
+
+class XAIResponse(BaseModel):
+    """Combined XAI explanations response."""
+
+    shap: SHAPExplanation | dict[str, Any]
+    lime: LIMEExplanation | dict[str, Any]
+    pdp_1d: PDP1DResponse | dict[str, Any]
+    ice_1d: ICE1DResponse | dict[str, Any]
+    ale_1d: ALE1DResponse | dict[str, Any]
 

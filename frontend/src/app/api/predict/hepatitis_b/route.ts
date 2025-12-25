@@ -4,6 +4,7 @@ const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000"
 
 export async function POST(request: Request) {
     const payload = await request.json()
+    // XAI is included by default
 
     if (!BACKEND_URL) {
         return NextResponse.json(
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
     }
 
     try {
-        const response = await fetch(`${BACKEND_URL}/predict/hepatitis_b`, {
+        const response = await fetch(`${BACKEND_URL}/predict/hepatitis_b?include_xai=true`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)

@@ -18,6 +18,7 @@ from app.schemas.input_schema import (
     PredictionResponse,
 )
 from app.services.preprocessing import request_to_features
+from app.services.xai_service import compute_all_xai_explanations
 from app.utils.config import FeatureOrderError
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ except ImportError:
 router = APIRouter(tags=["prediction"])
 
 
-def _predict_with_model(payload, model_key: str, feature_order: list[str]) -> PredictionResponse:
+def _predict_with_model(payload, model_key: str, feature_order: list[str], include_xai: bool = True) -> PredictionResponse:
     """Shared prediction handler across models."""
     try:
         features = request_to_features(payload, feature_order)
@@ -105,8 +106,31 @@ def _predict_with_model(payload, model_key: str, feature_order: list[str]) -> Pr
             detail=f"Prediction failed: {str(exc)}"
         )
 
+    # Compute XAI explanations if requested
+    xai_explanations = None
+    if include_xai:
+        try:
+            logger.info("Computing XAI explanations for %s", model_key)
+            xai_explanations = compute_all_xai_explanations(model_key, features)
+            # Convert to dict for JSON serialization
+            xai_explanations = {
+                "shap": xai_explanations["shap"],
+                "lime": xai_explanations["lime"],
+                "pdp_1d": xai_explanations["pdp_1d"],
+                "ice_1d": xai_explanations["ice_1d"],
+                "ale_1d": xai_explanations["ale_1d"],
+            }
+        except Exception as exc:
+            logger.warning("Failed to compute XAI explanations for %s: %s", model_key, exc, exc_info=True)
+            # Don't fail the prediction if XAI fails, just log it
+            xai_explanations = {"error": f"XAI computation failed: {str(exc)}"}
+
     try:
-        return PredictionResponse(prediction=result.prediction, confidence=result.confidence)
+        return PredictionResponse(
+            prediction=result.prediction,
+            confidence=result.confidence,
+            xai=xai_explanations
+        )
     except Exception as exc:
         logger.error("Error creating response for %s: %s", model_key, exc, exc_info=True)
         raise HTTPException(
@@ -116,12 +140,15 @@ def _predict_with_model(payload, model_key: str, feature_order: list[str]) -> Pr
 
 
 @router.post("/predict", response_model=PredictionResponse)
-async def predict_endpoint(payload: PredictionRequest) -> PredictionResponse:
+async def predict_endpoint(
+    payload: PredictionRequest,
+    include_xai: bool = True
+) -> PredictionResponse:
     """Validate input, run inference, and return the ovarian model output."""
     config = MODEL_REGISTRY["ovarian"]
     try:
         data = payload.model_dump()
-        return _predict_with_model(data, "ovarian", config.feature_order)
+        return _predict_with_model(data, "ovarian", config.feature_order, include_xai=include_xai)
     except HTTPException:
         raise
     except Exception as exc:
@@ -133,26 +160,35 @@ async def predict_endpoint(payload: PredictionRequest) -> PredictionResponse:
 
 
 @router.post("/predict/ovarian", response_model=PredictionResponse)
-async def predict_ovarian(payload: PredictionRequest) -> PredictionResponse:
+async def predict_ovarian(
+    payload: PredictionRequest,
+    include_xai: bool = True
+) -> PredictionResponse:
     """Prediction endpoint for ovarian model (alias of /predict)."""
     config = MODEL_REGISTRY["ovarian"]
-    return _predict_with_model(payload.model_dump(), "ovarian", config.feature_order)
+    return _predict_with_model(payload.model_dump(), "ovarian", config.feature_order, include_xai=include_xai)
 
 
 @router.post("/predict/hepatitis_b", response_model=PredictionResponse)
-async def predict_hepatitis_b(payload: HepatitisBRequest) -> PredictionResponse:
+async def predict_hepatitis_b(
+    payload: HepatitisBRequest,
+    include_xai: bool = True
+) -> PredictionResponse:
     """Prediction endpoint for hepatitis B model."""
     config = MODEL_REGISTRY["hepatitis_b"]
     # Use by_alias=True so payload keys match the CSV headers
-    return _predict_with_model(payload.model_dump(by_alias=True), "hepatitis_b", config.feature_order)
+    return _predict_with_model(payload.model_dump(by_alias=True), "hepatitis_b", config.feature_order, include_xai=include_xai)
 
 
 @router.post("/predict/pcos", response_model=PredictionResponse)
-async def predict_pcos(payload: PcosRequest) -> PredictionResponse:
+async def predict_pcos(
+    payload: PcosRequest,
+    include_xai: bool = True
+) -> PredictionResponse:
     """Prediction endpoint for PCOS model."""
     config = MODEL_REGISTRY["pcos"]
     # Use by_alias=True so the payload keys match the original CSV headers
-    return _predict_with_model(payload.model_dump(by_alias=True), "pcos", config.feature_order)
+    return _predict_with_model(payload.model_dump(by_alias=True), "pcos", config.feature_order, include_xai=include_xai)
 
 
 @router.get("/health", response_model=HealthResponse)
