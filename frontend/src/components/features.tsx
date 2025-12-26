@@ -46,12 +46,13 @@ const Features = () => {
               key={feature.title}
               className="flex flex-col md:flex-row items-center gap-x-12 gap-y-6 md:even:flex-row-reverse"
             >
-              <div className="relative w-full md:basis-1/2 max-w-[200px] sm:max-w-[250px] md:max-w-[280px] lg:max-w-[320px] mx-auto">
+                <div className="relative w-full md:basis-1/2 max-w-[200px] sm:max-w-[250px] md:max-w-[280px] lg:max-w-[320px] mx-auto">
                 <div className="relative w-full aspect-[4/3] max-h-[180px] sm:max-h-[220px] md:max-h-[250px] lg:max-h-[280px]">
                   <Image
                     src={feature.image}
                     alt={feature.title}
                     fill
+                    loading="lazy"
                     className="object-contain"
                     sizes="(max-width: 640px) 200px, (max-width: 768px) 250px, (max-width: 1024px) 280px, 320px"
                   />

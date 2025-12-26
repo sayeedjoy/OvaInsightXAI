@@ -47,6 +47,7 @@ const Team = () => {
             className="h-20 w-20 rounded-full object-cover mx-auto bg-secondary"
             width={120}
             height={120}
+            loading="lazy"
           />
           <h3 className="mt-4 text-lg font-semibold">{supervisor.name}</h3>
           <p className="text-muted-foreground">{supervisor.title}</p>
@@ -63,6 +64,7 @@ const Team = () => {
               className="h-20 w-20 rounded-full object-cover mx-auto bg-secondary"
               width={120}
               height={120}
+              loading="lazy"
             />
             <h3 className="mt-4 text-lg font-semibold">{member.name}</h3>
             <p className="text-muted-foreground">{member.title}</p>
