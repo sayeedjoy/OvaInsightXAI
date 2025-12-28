@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { BrainTumorPredictionForm } from "@/components/brain-tumor-components"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -16,7 +16,15 @@ export default function BrainTumorPredictPage() {
     const [result, setResult] = useState<PredictionResult | null>(null)
     const [error, setError] = useState<string | null>(null)
 
+    // Track current preview URL for cleanup on unmount
+    const previewUrlRef = useRef<string | null>(null)
+
     const resetForm = () => {
+        // Revoke URL before resetting
+        if (previewUrlRef.current) {
+            URL.revokeObjectURL(previewUrlRef.current)
+            previewUrlRef.current = null
+        }
         setSelectedFile(null)
         setPreviewUrl(null)
         setResult(null)
@@ -28,21 +36,50 @@ export default function BrainTumorPredictPage() {
         setError(null)
         setResult(null)
 
-        // Create preview URL
+        // Revoke previous URL immediately (it's safe since we're replacing it)
+        const previousUrl = previewUrlRef.current
+
         if (file) {
-            const url = URL.createObjectURL(file)
-            setPreviewUrl(url)
-        } else {
-            if (previewUrl) {
-                URL.revokeObjectURL(previewUrl)
+            try {
+                // Create new preview URL first
+                const url = URL.createObjectURL(file)
+                previewUrlRef.current = url
+                setPreviewUrl(url)
+
+                // Revoke old URL after new one is set
+                if (previousUrl) {
+                    // Small delay to ensure the new image starts loading
+                    setTimeout(() => {
+                        try {
+                            URL.revokeObjectURL(previousUrl)
+                        } catch (err) {
+                            // Ignore errors when revoking
+                        }
+                    }, 100)
+                }
+            } catch (error) {
+                console.error("Failed to create object URL:", error)
+                setError("Failed to create image preview")
+                previewUrlRef.current = null
+                setPreviewUrl(null)
             }
+        } else {
+            // If no file, revoke the previous URL immediately
+            previewUrlRef.current = null
             setPreviewUrl(null)
+            if (previousUrl) {
+                try {
+                    URL.revokeObjectURL(previousUrl)
+                } catch (err) {
+                    // Ignore errors when revoking
+                }
+            }
         }
     }
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
-        
+
         if (!selectedFile) {
             setError("Please select an image file")
             return
@@ -95,11 +132,14 @@ export default function BrainTumorPredictPage() {
         }
     }
 
-    // Cleanup preview URL on unmount
-    if (previewUrl && !selectedFile) {
-        URL.revokeObjectURL(previewUrl)
-        setPreviewUrl(null)
-    }
+    // Cleanup preview URL only on unmount
+    useEffect(() => {
+        return () => {
+            if (previewUrlRef.current) {
+                URL.revokeObjectURL(previewUrlRef.current)
+            }
+        }
+    }, []) // Empty dependency array - only runs on unmount
 
     return (
         <>
@@ -124,8 +164,8 @@ export default function BrainTumorPredictPage() {
                             onReset={resetForm}
                         />
                     </div>
-                    <PredictionResultCard 
-                        result={result} 
+                    <PredictionResultCard
+                        result={result}
                         error={error}
                         conditionName="Brain Tumor"
                         displayClass={true}
