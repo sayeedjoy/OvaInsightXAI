@@ -6,17 +6,19 @@ import logging
 import sys
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 from app.model import predictor
 from app.model.registry import MODEL_REGISTRY
 from app.schemas.input_schema import (
+    BRAIN_TUMOR_CLASSES,
     HealthResponse,
     HepatitisBRequest,
     PcosRequest,
     PredictionRequest,
     PredictionResponse,
 )
+from app.services import image_preprocessing
 from app.services.preprocessing import request_to_features
 from app.services.xai import compute_all_xai_explanations
 from app.utils.config import FeatureOrderError
@@ -189,6 +191,94 @@ async def predict_pcos(
     config = MODEL_REGISTRY["pcos"]
     # Use by_alias=True so the payload keys match the original CSV headers
     return _predict_with_model(payload.model_dump(by_alias=True), "pcos", config.feature_order, include_xai=include_xai)
+
+
+@router.post("/predict/brain_tumor", response_model=PredictionResponse)
+async def predict_brain_tumor(
+    file: UploadFile = File(...),
+    include_xai: bool = False
+) -> PredictionResponse:
+    """Prediction endpoint for brain tumor model (image-based)."""
+    model_key = "brain_tumor"
+    
+    # Validate file type
+    if file.content_type not in ["image/jpeg", "image/jpg", "image/png"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Expected JPEG or PNG, got {file.content_type}"
+        )
+    
+    # Read image bytes
+    try:
+        image_bytes = await file.read()
+        if len(image_bytes) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Empty file provided"
+            )
+        # Limit file size to 10MB
+        if len(image_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File too large. Maximum size is 10MB"
+            )
+    except Exception as exc:
+        logger.error("Error reading image file: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to read image file: {str(exc)}"
+        )
+    
+    # Preprocess image
+    try:
+        image_tensor = image_preprocessing.preprocess_brain_mri_image(image_bytes)
+    except Exception as exc:
+        logger.error("Error preprocessing image: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Image preprocessing failed: {str(exc)}"
+        )
+    
+    # Load model
+    try:
+        predictor.ensure_model_loaded(model_key)
+    except FileNotFoundError as exc:
+        logger.error("Model file missing for %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Model file not found: {str(exc)}"
+        )
+    except Exception as exc:
+        logger.error("Error loading model %s: %s", model_key, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to load model: {str(exc)}"
+        )
+    
+    # Run prediction
+    try:
+        result = predictor.predict_image(image_tensor, model_key=model_key)
+    except Exception as exc:
+        logger.error("Error during brain tumor prediction: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Prediction failed: {str(exc)}"
+        )
+    
+    # Map prediction index to class name
+    prediction_idx = int(result.prediction)
+    if 0 <= prediction_idx < len(BRAIN_TUMOR_CLASSES):
+        prediction_class = BRAIN_TUMOR_CLASSES[prediction_idx]
+    else:
+        logger.warning("Invalid prediction index %d, using index as-is", prediction_idx)
+        prediction_class = prediction_idx
+    
+    # Return response (XAI not supported for image models currently)
+    return PredictionResponse(
+        prediction=prediction_class,  # Return class name as string
+        confidence=result.confidence,
+        xai=None  # XAI not implemented for image models
+    )
 
 
 @router.get("/health", response_model=HealthResponse)

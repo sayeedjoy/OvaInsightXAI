@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
                         value: [
                             "default-src 'self'",
                             "connect-src 'self'",
-                            "img-src 'self' data: https:",
+                            "img-src 'self' blob: data: https:",
                             "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
                             "style-src 'self' 'unsafe-inline'"
                         ].join("; ")
