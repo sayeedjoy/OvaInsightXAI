@@ -74,5 +74,10 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
             "Waist(inch)",
         ],
     ),
+    "brain_tumor": ModelConfig(
+        key="brain_tumor",
+        path=MODEL_DIR / "model_PTH.pth",
+        feature_order=[],  # Image-based model, no feature order needed
+    ),
 }
 

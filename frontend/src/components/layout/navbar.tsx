@@ -76,6 +76,14 @@ const modelMenuList: ModelMenuProps[] = [
         color: "text-amber-600 dark:text-amber-400",
         hoverColor: "hover:text-amber-600 dark:hover:text-amber-400",
         bgColor: "hover:bg-amber-600/10 dark:hover:bg-amber-400/10"
+    },
+    {
+        href: "/brain-tumor",
+        label: "Brain Tumor",
+        logo: "/model-ova.webp",
+        color: "text-blue-600 dark:text-blue-400",
+        hoverColor: "hover:text-blue-600 dark:hover:text-blue-400",
+        bgColor: "hover:bg-blue-600/10 dark:hover:bg-blue-400/10"
     }
 ]
 

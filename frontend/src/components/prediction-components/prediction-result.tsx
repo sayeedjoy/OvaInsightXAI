@@ -31,14 +31,30 @@ interface PredictionResultCardProps {
     result: PredictionResult | null
     error: string | null
     conditionName?: string
+    displayClass?: boolean  // If true, display prediction as class name directly
 }
 
 export function PredictionResultCard({
     result,
     error,
-    conditionName = "Ovarian Cancer"
+    conditionName = "Ovarian Cancer",
+    displayClass = false
 }: PredictionResultCardProps) {
     const getPredictionDisplay = (prediction: number | string) => {
+        // Handle string class names (e.g., "glioma", "meningioma")
+        if (typeof prediction === "string" && displayClass) {
+            const classLabel = prediction.charAt(0).toUpperCase() + prediction.slice(1)
+            return {
+                label: `Classified as: ${classLabel}`,
+                description: `The model has classified the MRI image as ${prediction}. Please consult with a healthcare professional for further evaluation and diagnostic testing.`,
+                variant: "default" as const,
+                icon: Info,
+                iconColor: "text-blue-600 dark:text-blue-500",
+                bgColor: "bg-blue-50 dark:bg-blue-950/20",
+                borderColor: "border-blue-200 dark:border-blue-800"
+            }
+        }
+        
         const predValue = typeof prediction === "string" 
             ? Number.parseFloat(prediction) 
             : prediction

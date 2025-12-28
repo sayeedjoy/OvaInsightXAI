@@ -27,7 +27,7 @@ class PredictionRequest(BaseModel):
 class PredictionResponse(BaseModel):
     """Response body returned by the /predict endpoint."""
 
-    prediction: Union[int, float]
+    prediction: Union[int, float, str]  # str for brain tumor class names
     confidence: float | None = None
     xai: dict[str, Any] | None = None
 
@@ -184,3 +184,7 @@ class XAIResponse(BaseModel):
     ice_1d: ICE1DResponse | dict[str, Any]
     ale_1d: ALE1DResponse | dict[str, Any]
 
+
+# Brain Tumor Classification Classes
+BRAIN_TUMOR_CLASSES = ["glioma", "meningioma", "tumor"]
+"""Class mapping for brain tumor model: 0=glioma, 1=meningioma, 2=tumor"""

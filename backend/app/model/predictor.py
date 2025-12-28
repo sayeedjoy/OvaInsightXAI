@@ -152,8 +152,352 @@ def _candidate_model_paths(primary: Path, config: ModelConfig) -> list[Path]:
     return candidates
 
 
+def _load_pytorch_model(path: Path) -> Any:
+    """Load PyTorch model from .pth file."""
+    import os
+    import torch
+    
+    if not path.exists():
+        raise FileNotFoundError(f"Model file not found at {path}")
+    
+    logger.info("Loading PyTorch model from %s", path)
+    
+    try:
+        # Try loading as full model object first
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        logger.info("Using device: %s", device)
+        
+        try:
+            # Try loading as full model (if saved with torch.save(model, ...))
+            model = torch.load(path, map_location=device)
+            if hasattr(model, "eval"):
+                # It's a model object
+                model.eval()
+                logger.info("Loaded PyTorch model as full object")
+                return model
+            elif isinstance(model, dict):
+                state_dict = None
+                num_classes = 3  # Brain tumor has 3 classes
+                
+                # Extract state_dict (could be nested or direct)
+                if "state_dict" in model:
+                    state_dict = model["state_dict"]
+                elif all(isinstance(k, str) for k in model.keys()):
+                    # Might be a direct state_dict (all keys are strings)
+                    # Check if it looks like a state_dict (has typical PyTorch layer names)
+                    sample_keys = list(model.keys())[:5]
+                    if any(any(marker in k for marker in ["weight", "bias", "running_mean", "running_var"]) for k in sample_keys):
+                        state_dict = model
+                
+                if state_dict is None:
+                    raise ValueError(
+                        "Model file format not recognized. Expected full model object or dict with 'state_dict' key."
+                    )
+                
+                # Check for architecture specification via environment variable
+                model_arch = os.getenv("BRAIN_TUMOR_MODEL_ARCH")
+                if model_arch:
+                    logger.info("Using architecture specified in BRAIN_TUMOR_MODEL_ARCH: %s", model_arch)
+                    pytorch_model = _create_model_from_arch(model_arch, num_classes, state_dict)
+                    if pytorch_model:
+                        return pytorch_model
+                    else:
+                        logger.warning("Failed to load with specified architecture %s, attempting inference...", model_arch)
+                
+                logger.warning("Model contains state_dict but no architecture info. Attempting to infer...")
+                
+                # Detect architecture hints from state_dict keys (do this before helper function)
+                sample_keys = list(state_dict.keys())[:10]
+                is_vit_like = any("patch_embed" in k for k in sample_keys)
+                has_backbone_prefix = any(k.startswith("backbone.") for k in sample_keys)
+                has_classifier_prefix = any(k.startswith("classifier.") for k in state_dict.keys())
+                has_pvt_stages = any("stages" in k for k in state_dict.keys())
+                
+                # Special case: PVTv2 backbone with custom classifier (federated learning model)
+                if has_backbone_prefix and has_classifier_prefix and has_pvt_stages:
+                    logger.info("Detected PVTv2 backbone with custom classifier - attempting specialized load")
+                    try:
+                        import timm
+                        import torch.nn as nn
+                        
+                        # Analyze classifier structure from state_dict
+                        # Structure: net.0=LayerNorm(512), net.2=Linear(512->256), net.5=Linear(256->3)
+                        classifier_keys = [k for k in state_dict.keys() if k.startswith("classifier.")]
+                        
+                        # Get layer structure by examining weight shapes
+                        layer_norm_weight = state_dict.get("classifier.net.0.weight")  # 1D: LayerNorm
+                        linear1_weight = state_dict.get("classifier.net.2.weight")     # 2D: Linear
+                        linear2_weight = state_dict.get("classifier.net.5.weight")     # 2D: Linear
+                        
+                        if layer_norm_weight is not None and linear1_weight is not None and linear2_weight is not None:
+                            # LayerNorm has 1D weight (norm_dim,)
+                            # Linear has 2D weight (out_features, in_features)
+                            backbone_out_dim = layer_norm_weight.shape[0]  # 512
+                            hidden_dim = linear1_weight.shape[0]           # 256
+                            classifier_classes = linear2_weight.shape[0]   # 3
+                            
+                            logger.info("Classifier structure: backbone_out=%d, hidden=%d, classes=%d",
+                                      backbone_out_dim, hidden_dim, classifier_classes)
+                            
+                            # Try different PVTv2 variants to find one that matches
+                            pvt_models = ["pvt_v2_b1", "pvt_v2_b2", "pvt_v2_b3", "pvt_v2_b4", "pvt_v2_b5", "pvt_v2_b0"]
+                            
+                            for pvt_name in pvt_models:
+                                try:
+                                    # Create PVTv2 and check if output dim matches
+                                    pvt_backbone = timm.create_model(pvt_name, pretrained=False, num_classes=0)
+                                    
+                                    # Get feature dim by running a dummy forward
+                                    with torch.no_grad():
+                                        dummy = torch.zeros(1, 3, 224, 224)
+                                        feat = pvt_backbone(dummy)
+                                        feat_dim = feat.shape[-1]
+                                    
+                                    if feat_dim == backbone_out_dim:
+                                        logger.info("Found matching PVTv2 variant: %s (feature_dim=%d)", pvt_name, feat_dim)
+                                        
+                                        # Build the full model matching the state_dict structure
+                                        # Structure: LayerNorm -> ReLU -> Linear -> ReLU -> Dropout -> Linear
+                                        class PVT2WithClassifier(nn.Module):
+                                            def __init__(self, backbone, feat_dim, hidden_dim, num_classes, dropout=0.3):
+                                                super().__init__()
+                                                self.backbone = backbone
+                                                # Match classifier.net.[0,1,2,3,4,5] structure
+                                                self.classifier = nn.Module()
+                                                self.classifier.net = nn.Sequential(
+                                                    nn.LayerNorm(feat_dim),              # net.0: LayerNorm
+                                                    nn.ReLU(inplace=True),               # net.1: ReLU
+                                                    nn.Linear(feat_dim, hidden_dim),     # net.2: Linear(512->256)
+                                                    nn.ReLU(inplace=True),               # net.3: ReLU
+                                                    nn.Dropout(dropout),                 # net.4: Dropout
+                                                    nn.Linear(hidden_dim, num_classes)   # net.5: Linear(256->3)
+                                                )
+                                            
+                                            def forward(self, x):
+                                                features = self.backbone(x)
+                                                return self.classifier.net(features)
+                                        
+                                        # Create model instance
+                                        pvt_model = PVT2WithClassifier(pvt_backbone, feat_dim, hidden_dim, classifier_classes)
+                                        
+                                        # Load state_dict (strict=False to allow extra keys from federated learning)
+                                        missing, unexpected = pvt_model.load_state_dict(state_dict, strict=False)
+                                        # Accept if no missing keys (unexpected keys like adapters/brain_tuner are OK)
+                                        if len(missing) == 0:
+                                            pvt_model.eval()
+                                            logger.info("Successfully loaded PVTv2 model: %s (missing: %d, unexpected: %d)", 
+                                                      pvt_name, len(missing), len(unexpected))
+                                            if unexpected:
+                                                logger.debug("Ignoring %d unexpected keys (adapters, tuners, etc.)", len(unexpected))
+                                            return pvt_model
+                                        else:
+                                            logger.debug("PVTv2 %s: missing keys %s", pvt_name, missing[:5])
+                                except Exception as e:
+                                    logger.debug("PVTv2 %s failed: %s", pvt_name, e)
+                                    continue
+                    except ImportError:
+                        logger.warning("timm not available, cannot load PVTv2 model")
+                    except Exception as e:
+                        logger.warning("PVTv2 specialized load failed: %s", e)
+                
+                if is_vit_like:
+                    logger.info("Detected ViT-like architecture from state_dict keys (contains 'patch_embed')")
+                
+                # Helper function to try loading with state_dict, handling key prefixes
+                def try_load_state_dict(model_instance, state_dict_in):
+                    try:
+                        model_instance.load_state_dict(state_dict_in, strict=True)
+                        return True
+                    except Exception:
+                        # Try with prefix removal (prioritize "backbone." as it's common)
+                        for prefix in ["backbone.", "model.", "module.", ""]:
+                            try:
+                                if prefix:
+                                    # Only process keys that start with the prefix
+                                    new_state_dict = {k[len(prefix):]: v for k, v in state_dict_in.items() if k.startswith(prefix)}
+                                    # If we didn't match any keys with this prefix, skip
+                                    if not new_state_dict:
+                                        continue
+                                else:
+                                    new_state_dict = state_dict_in
+                                model_instance.load_state_dict(new_state_dict, strict=True)
+                                if prefix:
+                                    logger.info("Loaded state_dict with prefix '%s' removed", prefix)
+                                return True
+                            except Exception:
+                                continue
+                        return False
+                
+                # Try ResNet architectures (more variants)
+                try:
+                    import torchvision.models as models
+                    resnet_archs = [
+                        models.resnet18, models.resnet34, models.resnet50,
+                        models.resnet101, models.resnet152
+                    ]
+                    for resnet_class in resnet_archs:
+                        try:
+                            pytorch_model = resnet_class(pretrained=False, num_classes=num_classes)
+                            if try_load_state_dict(pytorch_model, state_dict):
+                                pytorch_model.eval()
+                                logger.info("Successfully loaded model as %s", resnet_class.__name__)
+                                return pytorch_model
+                        except Exception:
+                            continue
+                except Exception as e:
+                    logger.debug("ResNet architectures failed: %s", e)
+                
+                # Try timm models if available (many more options)
+                # Prioritize ViT models if we detect ViT-like keys
+                try:
+                    import timm
+                    if is_vit_like:
+                        # Try ViT models first if we detect ViT-like architecture
+                        vit_models = [
+                            "vit_base_patch16_224", "vit_small_patch16_224", "vit_tiny_patch16_224",
+                            "vit_large_patch16_224", "deit_base_patch16_224", "deit_small_patch16_224"
+                        ]
+                        for model_name in vit_models:
+                            try:
+                                pytorch_model = timm.create_model(model_name, pretrained=False, num_classes=num_classes)
+                                if try_load_state_dict(pytorch_model, state_dict):
+                                    pytorch_model.eval()
+                                    logger.info("Successfully loaded model as %s", model_name)
+                                    return pytorch_model
+                            except Exception:
+                                continue
+                    
+                    # Try all common models
+                    timm_models = [
+                        "efficientnet_b0", "efficientnet_b1", "efficientnet_b2", "efficientnet_b3",
+                        "resnet18", "resnet34", "resnet50", "resnet101",
+                        "vit_base_patch16_224", "vit_small_patch16_224",
+                        "densenet121", "densenet169",
+                        "mobilenetv3_small_100", "mobilenetv3_large_100"
+                    ]
+                    for model_name in timm_models:
+                        try:
+                            pytorch_model = timm.create_model(model_name, pretrained=False, num_classes=num_classes)
+                            if try_load_state_dict(pytorch_model, state_dict):
+                                pytorch_model.eval()
+                                logger.info("Successfully loaded model as %s", model_name)
+                                return pytorch_model
+                        except Exception:
+                            continue
+                except ImportError:
+                    logger.warning("timm not available for model architecture inference")
+                
+                # Get some sample keys for error message
+                sample_keys_display = list(state_dict.keys())[:3] if state_dict else []
+                suggestion = ""
+                if is_vit_like:
+                    suggestion = "Based on state_dict keys (contains 'patch_embed'), this appears to be a Vision Transformer (ViT). Try: 'vit_base_patch16_224', 'vit_small_patch16_224', or 'deit_base_patch16_224'."
+                elif has_backbone_prefix:
+                    suggestion = "State_dict has 'backbone.' prefix. Try common architectures like 'resnet50', 'efficientnet_b0', or 'vit_base_patch16_224'."
+                else:
+                    suggestion = "Try common architectures like 'resnet18', 'efficientnet_b0', 'resnet50', or 'vit_base_patch16_224'."
+                
+                raise ValueError(
+                    f"Could not infer model architecture from state_dict. "
+                    f"Sample state_dict keys: {sample_keys_display}. "
+                    f"{suggestion} "
+                    f"Please specify the architecture using the BRAIN_TUMOR_MODEL_ARCH environment variable "
+                    f"(e.g., export BRAIN_TUMOR_MODEL_ARCH=vit_base_patch16_224). "
+                    f"Alternatively, save the model as a full model object instead of just state_dict."
+                )
+            else:
+                raise ValueError(
+                    "Model file format not recognized. Expected full model object or dict."
+                )
+        except Exception as exc:
+            logger.error("Failed to load PyTorch model: %s", exc, exc_info=True)
+            raise ValueError(f"Failed to load PyTorch model: {str(exc)}") from exc
+            
+    except ImportError:
+        raise ImportError("PyTorch is not installed. Please install torch to use PyTorch models.")
+
+
+def _create_model_from_arch(arch_name: str, num_classes: int, state_dict: dict) -> Any | None:
+    """Create a model instance from architecture name and load state_dict."""
+    import torch
+    
+    try:
+        # Helper to try loading with prefix handling
+        def try_load_with_prefixes(model_instance, state_dict_in):
+            # Try strict loading first
+            try:
+                model_instance.load_state_dict(state_dict_in, strict=True)
+                return True
+            except Exception:
+                # Try with prefix removal
+                for prefix in ["model.", "module.", "backbone.", ""]:
+                    try:
+                        if prefix:
+                            new_state_dict = {k[len(prefix):]: v for k, v in state_dict_in.items() if k.startswith(prefix)}
+                            if not new_state_dict:
+                                continue
+                        else:
+                            new_state_dict = state_dict_in
+                        model_instance.load_state_dict(new_state_dict, strict=True)
+                        if prefix:
+                            logger.info("Loaded state_dict with prefix '%s' removed", prefix)
+                        return True
+                    except Exception:
+                        continue
+                # Last resort: try with strict=False
+                try:
+                    model_instance.load_state_dict(state_dict_in, strict=False)
+                    logger.warning("Loaded state_dict with strict=False (some keys may be missing)")
+                    return True
+                except Exception:
+                    return False
+        
+        # Try torchvision models first
+        try:
+            import torchvision.models as models
+            arch_map = {
+                "resnet18": models.resnet18,
+                "resnet34": models.resnet34,
+                "resnet50": models.resnet50,
+                "resnet101": models.resnet101,
+                "resnet152": models.resnet152,
+            }
+            if arch_name.lower() in arch_map:
+                model_class = arch_map[arch_name.lower()]
+                pytorch_model = model_class(pretrained=False, num_classes=num_classes)
+                if try_load_with_prefixes(pytorch_model, state_dict):
+                    pytorch_model.eval()
+                    logger.info("Successfully loaded model as %s", arch_name)
+                    return pytorch_model
+        except Exception as e:
+            logger.debug("Failed to load %s from torchvision: %s", arch_name, e)
+        
+        # Try timm models
+        try:
+            import timm
+            pytorch_model = timm.create_model(arch_name, pretrained=False, num_classes=num_classes)
+            if try_load_with_prefixes(pytorch_model, state_dict):
+                pytorch_model.eval()
+                logger.info("Successfully loaded model as %s from timm", arch_name)
+                return pytorch_model
+        except Exception as e:
+            logger.debug("Failed to load %s from timm: %s", arch_name, e)
+        
+        return None
+    except Exception as e:
+        logger.error("Error creating model from arch %s: %s", arch_name, e)
+        return None
+
+
 def _load_and_extract(path: Path, *, config: ModelConfig) -> tuple[Any, Any]:
     """Load artifact from path and extract estimator/pipeline."""
+    # Check if this is a PyTorch model
+    if path.suffix == ".pth" or config.key == "brain_tumor":
+        model = _load_pytorch_model(path)
+        # For PyTorch models, we return the model itself as both artifact and model
+        return model, model
+    
+    # sklearn model loading
     if config.key == "ovarian":
         _retrain_model_if_needed(path)
     artifact = _load_model(path)
@@ -726,7 +1070,11 @@ def ensure_model_loaded(model_key: str = _DEFAULT_MODEL_KEY) -> None:
 
             _MODEL_ARTIFACTS[model_key] = artifact
             _MODELS[model_key] = model
-            _SUPPORTS_PROBA[model_key] = hasattr(model, "predict_proba")
+            # PyTorch models support probabilities via softmax, sklearn models via predict_proba
+            if config.key == "brain_tumor":
+                _SUPPORTS_PROBA[model_key] = True  # PyTorch models always support probabilities
+            else:
+                _SUPPORTS_PROBA[model_key] = hasattr(model, "predict_proba")
             _LOADED_MODEL_PATHS[model_key] = candidate
             if candidate != primary_path:
                 logger.warning(
@@ -782,6 +1130,41 @@ def get_model(model_key: str = _DEFAULT_MODEL_KEY) -> Any:
     if model_key not in _MODELS:
         raise RuntimeError("Model has not been loaded yet. Call ensure_model_loaded().")
     return _MODELS[model_key]
+
+
+def predict_image(image_tensor: Any, *, model_key: str = "brain_tumor") -> PredictionResult:
+    """Run inference on an image tensor for PyTorch models."""
+    if model_key not in _MODELS:
+        raise RuntimeError("Model has not been loaded yet. Call ensure_model_loaded().")
+    
+    model = _MODELS[model_key]
+    import torch
+    
+    try:
+        device = next(model.parameters()).device
+        image_tensor = image_tensor.to(device)
+        
+        model.eval()
+        with torch.no_grad():
+            outputs = model(image_tensor)
+            
+            # Get probabilities using softmax
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            confidence, predicted_class = torch.max(probabilities, 1)
+            
+            predicted_class_idx = predicted_class.item()
+            confidence_value = confidence.item()
+        
+        logger.info(
+            "Image prediction completed for %s: class=%s, confidence=%.4f",
+            model_key, predicted_class_idx, confidence_value
+        )
+        
+        return PredictionResult(prediction=int(predicted_class_idx), confidence=float(confidence_value))
+        
+    except Exception as exc:
+        logger.error("Error during image prediction: %s", exc, exc_info=True)
+        raise ValueError(f"Image prediction failed: {str(exc)}") from exc
 
 
 def predict(features: Sequence[float], *, model_key: str = _DEFAULT_MODEL_KEY) -> PredictionResult:
