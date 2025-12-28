@@ -19,14 +19,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Install system dependencies for Python packages that need compilation
 # SHAP requires libgomp1, libgcc-s1, and g++ for C++ extensions
-# OpenCV headless needs libgl1-mesa-glx for some operations
+# Note: opencv-python-headless doesn't require GUI/OpenGL libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     libgomp1 \
     libgcc-s1 \
     build-essential \
-    libgl1-mesa-glx \
     libglib2.0-0 \
     curl \
     && rm -rf /var/lib/apt/lists/* \
