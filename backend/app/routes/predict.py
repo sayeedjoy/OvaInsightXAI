@@ -283,18 +283,31 @@ async def predict_brain_tumor(
 
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    """Lightweight readiness probe."""
-    try:
-        predictor.ensure_model_loaded("ovarian")
-    except FileNotFoundError:
+    """Lightweight readiness probe for cloud health checks.
+    
+    Returns OK if at least one model is loadable, with details about all models.
+    This makes the endpoint more robust for partial deployments.
+    """
+    models_status = {}
+    any_model_loaded = False
+    
+    for model_key in MODEL_REGISTRY.keys():
+        try:
+            predictor.ensure_model_loaded(model_key)
+            models_status[model_key] = "ok"
+            any_model_loaded = True
+        except FileNotFoundError:
+            models_status[model_key] = "model_file_missing"
+        except Exception as exc:
+            models_status[model_key] = f"error: {str(exc)[:100]}"
+    
+    if not any_model_loaded:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Model file missing",
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Model not ready: {str(exc)}",
+            detail={
+                "message": "No models available",
+                "models": models_status
+            },
         )
 
     return HealthResponse(status="ok")

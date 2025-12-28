@@ -26,8 +26,13 @@ virtualenv/
 *~
 .cursor/
 
-# Model file (will be mounted as volume)
+# Model file - ovarian model is retrained during build, so ignore it
+# Other models (Hepatitis_B.pkl, pcos.pkl, model_PTH.pth) should be INCLUDED
 app/model/model.pkl
+# Never ignore these model files - they are needed:
+# !app/model/Hepatitis_B.pkl
+# !app/model/pcos.pkl
+# !app/model/model_PTH.pth
 
 # Documentation
 *.md
