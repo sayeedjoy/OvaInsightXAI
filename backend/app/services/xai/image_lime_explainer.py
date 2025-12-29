@@ -17,11 +17,11 @@ from app.model import predictor
 logger = logging.getLogger(__name__)
 
 # Environment-configurable sample sizes for performance tuning
-# Reduced from 300 to 100 for faster computation while maintaining quality
-DEFAULT_NUM_SAMPLES = int(os.getenv("LIME_IMAGE_NUM_SAMPLES", "100"))
-DEFAULT_NUM_FEATURES = int(os.getenv("LIME_IMAGE_NUM_FEATURES", "10"))
-# Batch size for model inference (balance memory vs speed)
-LIME_BATCH_SIZE = int(os.getenv("LIME_IMAGE_BATCH_SIZE", "16"))
+# ULTRA-LIGHT: Reduced from 300 to 50 for minimal CPU usage
+DEFAULT_NUM_SAMPLES = int(os.getenv("LIME_IMAGE_NUM_SAMPLES", "50"))
+DEFAULT_NUM_FEATURES = int(os.getenv("LIME_IMAGE_NUM_FEATURES", "5"))
+# Batch size for model inference (larger batch = fewer forward passes)
+LIME_BATCH_SIZE = int(os.getenv("LIME_IMAGE_BATCH_SIZE", "25"))
 
 
 def compute_image_lime_explanation(

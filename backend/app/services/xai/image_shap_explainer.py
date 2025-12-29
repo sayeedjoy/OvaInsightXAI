@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 # Environment-configurable sample sizes for performance tuning
 DEFAULT_BACKGROUND_SAMPLES = int(os.getenv("SHAP_IMAGE_BACKGROUND_SAMPLES", "10"))
-# Larger patch/stride for faster computation (32px patch, 16px stride)
-DEFAULT_PATCH_SIZE = int(os.getenv("SHAP_IMAGE_PATCH_SIZE", "32"))
-DEFAULT_STRIDE = int(os.getenv("SHAP_IMAGE_STRIDE", "16"))
+# ULTRA-LIGHT: Large patch/stride for minimal grid (48px patch, 24px stride = ~25 cells)
+DEFAULT_PATCH_SIZE = int(os.getenv("SHAP_IMAGE_PATCH_SIZE", "48"))
+DEFAULT_STRIDE = int(os.getenv("SHAP_IMAGE_STRIDE", "24"))
 # Maximum batch size for inference (balance memory vs speed)
 MAX_BATCH_SIZE = int(os.getenv("SHAP_IMAGE_BATCH_SIZE", "32"))
 
