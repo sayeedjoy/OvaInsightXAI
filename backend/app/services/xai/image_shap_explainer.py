@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 
 # Environment-configurable sample sizes for performance tuning
 DEFAULT_BACKGROUND_SAMPLES = int(os.getenv("SHAP_IMAGE_BACKGROUND_SAMPLES", "10"))
+# Larger patch/stride for faster computation (32px patch, 16px stride)
+DEFAULT_PATCH_SIZE = int(os.getenv("SHAP_IMAGE_PATCH_SIZE", "32"))
+DEFAULT_STRIDE = int(os.getenv("SHAP_IMAGE_STRIDE", "16"))
+# Maximum batch size for inference (balance memory vs speed)
+MAX_BATCH_SIZE = int(os.getenv("SHAP_IMAGE_BATCH_SIZE", "32"))
 
 
 def compute_image_shap_explanation(
@@ -28,6 +33,8 @@ def compute_image_shap_explanation(
     
     Uses occlusion-based sensitivity analysis instead of GradientExplainer
     to avoid autograd issues with custom model architectures (e.g., PVTv2).
+    
+    OPTIMIZED: Uses batch inference to process multiple occluded images at once.
     
     Args:
         model_key: The model key (e.g., "brain_tumor")
@@ -72,16 +79,17 @@ def compute_image_shap_explanation(
             predicted_class = torch.argmax(original_probs, dim=1).item()
             original_prob = original_probs[0, predicted_class].item()
         
-        # Occlusion-based sensitivity analysis
-        # Use a smaller grid for faster computation
-        patch_size = 16  # Size of occlusion patch
-        stride = 8       # Stride for moving the patch
+        # Use configurable patch/stride for faster computation
+        patch_size = DEFAULT_PATCH_SIZE
+        stride = DEFAULT_STRIDE
         
         # Calculate heatmap dimensions
         heatmap_h = (h - patch_size) // stride + 1
         heatmap_w = (w - patch_size) // stride + 1
         
-        sensitivity_map = np.zeros((heatmap_h, heatmap_w))
+        # Pre-create all occluded tensors for batch processing
+        occluded_tensors = []
+        grid_positions = []
         
         for i in range(heatmap_h):
             for j in range(heatmap_w):
@@ -95,15 +103,30 @@ def compute_image_shap_explanation(
                 # Occlude with zeros (black patch in normalized space)
                 occluded_tensor[:, y_start:y_end, x_start:x_end] = 0
                 
-                # Get prediction for occluded image
-                with torch.no_grad():
-                    occluded_batch = occluded_tensor.unsqueeze(0).to(device)
-                    outputs = model(occluded_batch)
-                    probs = torch.nn.functional.softmax(outputs, dim=1)
-                    occluded_prob = probs[0, predicted_class].item()
+                occluded_tensors.append(occluded_tensor)
+                grid_positions.append((i, j))
+        
+        # Process in batches for efficiency
+        sensitivity_values = []
+        batch_size = min(MAX_BATCH_SIZE, len(occluded_tensors))
+        
+        with torch.no_grad():
+            for batch_start in range(0, len(occluded_tensors), batch_size):
+                batch_end = min(batch_start + batch_size, len(occluded_tensors))
+                batch_tensors = occluded_tensors[batch_start:batch_end]
                 
-                # Sensitivity = drop in probability when region is occluded
-                sensitivity_map[i, j] = original_prob - occluded_prob
+                # Stack into batch and run inference
+                batch = torch.stack(batch_tensors).to(device)
+                outputs = model(batch)
+                probs = torch.nn.functional.softmax(outputs, dim=1)
+                occluded_probs = probs[:, predicted_class].cpu().numpy()
+                
+                # Calculate sensitivity (drop in probability when region is occluded)
+                for prob in occluded_probs:
+                    sensitivity_values.append(original_prob - prob)
+        
+        # Reshape to heatmap
+        sensitivity_map = np.array(sensitivity_values).reshape(heatmap_h, heatmap_w)
         
         # Resize sensitivity map to original image size
         from PIL import Image as PILImage
@@ -230,4 +253,3 @@ def _heatmap_to_base64(heatmap: np.ndarray) -> str:
     img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
     
     return f"data:image/png;base64,{img_str}"
-

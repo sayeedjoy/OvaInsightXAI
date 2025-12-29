@@ -15,9 +15,11 @@ logger = logging.getLogger(__name__)
 
 # Environment-configurable parameters
 # Reduced parameters for faster computation while maintaining quality
-DEFAULT_GRID_SIZE = int(os.getenv("ICE_IMAGE_GRID_SIZE", "4"))  # 4x4 = 16 patches
-DEFAULT_N_GRID_POINTS = int(os.getenv("ICE_IMAGE_N_GRID_POINTS", "10"))  # Number of intensity levels
-DEFAULT_N_SAMPLES = int(os.getenv("ICE_IMAGE_N_SAMPLES", "5"))  # Number of sample curves per patch
+DEFAULT_GRID_SIZE = int(os.getenv("ICE_IMAGE_GRID_SIZE", "3"))  # 3x3 = 9 patches
+DEFAULT_N_GRID_POINTS = int(os.getenv("ICE_IMAGE_N_GRID_POINTS", "5"))  # Number of intensity levels
+DEFAULT_N_SAMPLES = int(os.getenv("ICE_IMAGE_N_SAMPLES", "3"))  # Number of sample curves per patch
+# Batch size for inference
+ICE_BATCH_SIZE = int(os.getenv("ICE_IMAGE_BATCH_SIZE", "16"))
 
 
 def compute_image_ice_explanation(
@@ -29,15 +31,17 @@ def compute_image_ice_explanation(
 ) -> dict[str, Any]:
     """Compute ICE for an image prediction using patch-based approach.
     
+    OPTIMIZED: Uses batch inference to process all samples and intensity levels at once.
+    
     Divides the image into patches and shows individual conditional expectation
     curves for each patch by varying patch intensity.
     
     Args:
         model_key: The model key (e.g., "brain_tumor")
         image_tensor: Preprocessed image tensor (PyTorch tensor) with shape (1, C, H, W) or (C, H, W)
-        grid_size: Size of the grid (e.g., 8 means 8x8 = 64 patches)
-        n_grid_points: Number of intensity levels to test per patch (default: 20)
-        n_samples: Number of sample variations per patch (default: 10)
+        grid_size: Size of the grid (e.g., 3 means 3x3 = 9 patches)
+        n_grid_points: Number of intensity levels to test per patch (default: 5)
+        n_samples: Number of sample variations per patch (default: 3)
     
     Returns:
         Dictionary with ICE curves for each patch region
@@ -81,13 +85,17 @@ def compute_image_ice_explanation(
             original_probs = torch.nn.functional.softmax(original_outputs, dim=1)
             original_predicted_class = torch.argmax(original_probs, dim=1).item()
         
+        # ImageNet normalization constants
+        IMAGENET_MEAN = [0.485, 0.456, 0.406]
+        IMAGENET_STD = [0.229, 0.224, 0.225]
+        
+        # Create grid of intensity values to test
+        intensity_values = np.linspace(0.0, 1.0, n_grid_points)
+        
         # Compute ICE for each patch
         ice_plots = []
         
-        # Limit number of patches to compute for performance
-        max_patches = min(grid_size * grid_size, 9)  # Compute up to 9 patches
-        
-        for patch_idx in range(max_patches):
+        for patch_idx in range(grid_size * grid_size):
             try:
                 # Calculate patch coordinates
                 row = patch_idx // grid_size
@@ -97,19 +105,15 @@ def compute_image_ice_explanation(
                 x_start = col * patch_w
                 x_end = (col + 1) * patch_w if col < grid_size - 1 else w
                 
-                # Create grid of intensity values to test
-                intensity_values = np.linspace(0.0, 1.0, n_grid_points)
-                
-                # Generate multiple sample curves by adding small random variations
-                curves = []
+                # Pre-create all modified tensors for batch inference
+                all_modified_tensors = []
+                sample_intensity_map = []  # Track which sample/intensity each tensor belongs to
                 
                 for sample_idx in range(n_samples):
-                    sample_predictions = []
-                    
                     # Add small random variation to base image for this sample
-                    variation_scale = 0.05 * (sample_idx / n_samples)  # Small variations
+                    variation_scale = 0.05 * (sample_idx / max(n_samples - 1, 1))
                     
-                    for intensity in intensity_values:
+                    for intensity_idx, intensity in enumerate(intensity_values):
                         # Create modified image with patch intensity changed
                         modified_tensor = image_tensor_no_batch.clone()
                         
@@ -120,33 +124,38 @@ def compute_image_ice_explanation(
                         
                         # Apply intensity to the patch region
                         for channel in range(c):
-                            # Get the patch region
                             patch_region = modified_tensor[channel, y_start:y_end, x_start:x_end]
                             
-                            # Denormalize, apply intensity, then renormalize
-                            IMAGENET_MEAN = 0.485 if channel == 0 else (0.456 if channel == 1 else 0.406)
-                            IMAGENET_STD = 0.229 if channel == 0 else (0.224 if channel == 1 else 0.225)
-                            
-                            # Denormalize patch
-                            denormalized_patch = patch_region * IMAGENET_STD + IMAGENET_MEAN
-                            
-                            # Apply intensity (scale by intensity value)
+                            # Denormalize, apply intensity, renormalize
+                            denormalized_patch = patch_region * IMAGENET_STD[channel] + IMAGENET_MEAN[channel]
                             modified_patch = denormalized_patch * intensity
+                            normalized_patch = (modified_patch - IMAGENET_MEAN[channel]) / IMAGENET_STD[channel]
                             
-                            # Renormalize
-                            normalized_patch = (modified_patch - IMAGENET_MEAN) / IMAGENET_STD
-                            
-                            # Update the patch
                             modified_tensor[channel, y_start:y_end, x_start:x_end] = normalized_patch
                         
-                        # Get prediction for modified image
-                        with torch.no_grad():
-                            modified_batch = modified_tensor.unsqueeze(0).to(device)
-                            outputs = model(modified_batch)
-                            probs = torch.nn.functional.softmax(outputs, dim=1)
-                            # Get probability for the predicted class
-                            pred_prob = probs[0, original_predicted_class].item()
-                            sample_predictions.append(float(pred_prob))
+                        all_modified_tensors.append(modified_tensor)
+                        sample_intensity_map.append((sample_idx, intensity_idx))
+                
+                # Batch inference for all samples and intensities
+                all_predictions = []
+                batch_size = min(ICE_BATCH_SIZE, len(all_modified_tensors))
+                
+                with torch.no_grad():
+                    for batch_start in range(0, len(all_modified_tensors), batch_size):
+                        batch_end = min(batch_start + batch_size, len(all_modified_tensors))
+                        batch = torch.stack(all_modified_tensors[batch_start:batch_end]).to(device)
+                        outputs = model(batch)
+                        probs = torch.nn.functional.softmax(outputs, dim=1)
+                        batch_preds = probs[:, original_predicted_class].cpu().numpy()
+                        all_predictions.extend([float(p) for p in batch_preds])
+                
+                # Organize predictions by sample
+                curves = []
+                for sample_idx in range(n_samples):
+                    sample_predictions = []
+                    for intensity_idx in range(n_grid_points):
+                        pred_idx = sample_idx * n_grid_points + intensity_idx
+                        sample_predictions.append(all_predictions[pred_idx])
                     
                     curves.append({
                         "sample_index": int(sample_idx),
@@ -194,4 +203,3 @@ def compute_image_ice_explanation(
     except Exception as exc:
         logger.error("Error computing ICE explanation for %s: %s (type: %s)", model_key, exc, type(exc).__name__, exc_info=True)
         return {"error": str(exc), "error_type": type(exc).__name__, "details": str(exc)}
-

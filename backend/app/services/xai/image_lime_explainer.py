@@ -17,9 +17,11 @@ from app.model import predictor
 logger = logging.getLogger(__name__)
 
 # Environment-configurable sample sizes for performance tuning
-# Reduced from 1000 to 300 for faster computation while maintaining quality
-DEFAULT_NUM_SAMPLES = int(os.getenv("LIME_IMAGE_NUM_SAMPLES", "300"))  # LIME perturbation samples
-DEFAULT_NUM_FEATURES = int(os.getenv("LIME_IMAGE_NUM_FEATURES", "10"))  # Top features to return
+# Reduced from 300 to 100 for faster computation while maintaining quality
+DEFAULT_NUM_SAMPLES = int(os.getenv("LIME_IMAGE_NUM_SAMPLES", "100"))
+DEFAULT_NUM_FEATURES = int(os.getenv("LIME_IMAGE_NUM_FEATURES", "10"))
+# Batch size for model inference (balance memory vs speed)
+LIME_BATCH_SIZE = int(os.getenv("LIME_IMAGE_BATCH_SIZE", "16"))
 
 
 def compute_image_lime_explanation(
@@ -30,10 +32,12 @@ def compute_image_lime_explanation(
 ) -> dict[str, Any]:
     """Compute LIME explanation for an image prediction.
     
+    OPTIMIZED: Uses batch inference in predict_fn for faster processing.
+    
     Args:
         model_key: The model key (e.g., "brain_tumor")
         image_tensor: Preprocessed image tensor (PyTorch tensor)
-        num_samples: Number of LIME perturbation samples (default: 1000)
+        num_samples: Number of LIME perturbation samples (default: 100)
         num_features: Number of top features to return (default: 10)
     
     Returns:
@@ -84,26 +88,35 @@ def compute_image_lime_explanation(
         explainer = lime_image.LimeImageExplainer()
         
         # Define prediction function that works with numpy arrays
+        # OPTIMIZED: Process in batches for much faster inference
         def predict_fn(images: np.ndarray) -> np.ndarray:
-            """Convert numpy images to tensors, run model, return probabilities."""
-            # images is [N, H, W, C] numpy array
-            batch_size = images.shape[0]
-            predictions = []
+            """Convert numpy images to tensors, run model in batches, return probabilities."""
+            batch_size_total = images.shape[0]
+            all_predictions = []
             
-            for i in range(batch_size):
-                img = images[i]
-                # Convert to tensor and preprocess
-                img_tensor = _numpy_to_tensor_for_model(img)
-                img_tensor = img_tensor.to(device).unsqueeze(0)
+            # Process in batches
+            for batch_start in range(0, batch_size_total, LIME_BATCH_SIZE):
+                batch_end = min(batch_start + LIME_BATCH_SIZE, batch_size_total)
+                batch_images = images[batch_start:batch_end]
+                
+                # Convert batch to tensors
+                batch_tensors = []
+                for i in range(len(batch_images)):
+                    img = batch_images[i]
+                    img_tensor = _numpy_to_tensor_for_model(img)
+                    batch_tensors.append(img_tensor)
+                
+                # Stack into batch and run inference
+                batch = torch.stack(batch_tensors).to(device)
                 
                 with torch.no_grad():
-                    outputs = model(img_tensor)
+                    outputs = model(batch)
                     probabilities = torch.nn.functional.softmax(outputs, dim=1)
-                    probs = probabilities[0].cpu().numpy()
+                    probs = probabilities.cpu().numpy()
                 
-                predictions.append(probs)
+                all_predictions.append(probs)
             
-            return np.array(predictions)
+            return np.concatenate(all_predictions, axis=0)
         
         # Explain the image
         explanation = explainer.explain_instance(
@@ -266,4 +279,3 @@ def _create_lime_visualization(original: np.ndarray, temp: np.ndarray, mask: np.
     img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
     
     return f"data:image/png;base64,{img_str}"
-

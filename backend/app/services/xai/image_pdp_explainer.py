@@ -17,9 +17,11 @@ from app.model import predictor
 logger = logging.getLogger(__name__)
 
 # Environment-configurable parameters
-# Reduced grid size (4x4=16 patches) and grid points (10) for faster computation
-DEFAULT_GRID_SIZE = int(os.getenv("PDP_IMAGE_GRID_SIZE", "4"))  # 4x4 = 16 patches
-DEFAULT_N_GRID_POINTS = int(os.getenv("PDP_IMAGE_N_GRID_POINTS", "10"))  # Number of intensity levels to test
+# Reduced grid size (3x3=9 patches) and grid points (5) for faster computation
+DEFAULT_GRID_SIZE = int(os.getenv("PDP_IMAGE_GRID_SIZE", "3"))
+DEFAULT_N_GRID_POINTS = int(os.getenv("PDP_IMAGE_N_GRID_POINTS", "5"))
+# Batch size for inference
+PDP_BATCH_SIZE = int(os.getenv("PDP_IMAGE_BATCH_SIZE", "16"))
 
 
 def compute_image_pdp_explanation(
@@ -30,14 +32,16 @@ def compute_image_pdp_explanation(
 ) -> dict[str, Any]:
     """Compute PDP for an image prediction using patch-based approach.
     
+    OPTIMIZED: Uses batch inference to process multiple intensity variations at once.
+    
     Divides the image into patches and measures how varying each patch's
     intensity affects the prediction.
     
     Args:
         model_key: The model key (e.g., "brain_tumor")
         image_tensor: Preprocessed image tensor (PyTorch tensor) with shape (1, C, H, W) or (C, H, W)
-        grid_size: Size of the grid (e.g., 8 means 8x8 = 64 patches)
-        n_grid_points: Number of intensity levels to test per patch (default: 20)
+        grid_size: Size of the grid (e.g., 3 means 3x3 = 9 patches)
+        n_grid_points: Number of intensity levels to test per patch (default: 5)
     
     Returns:
         Dictionary with PDP plots for each patch region
@@ -79,7 +83,14 @@ def compute_image_pdp_explanation(
             original_probs = torch.nn.functional.softmax(original_outputs, dim=1)
             original_predicted_class = torch.argmax(original_probs, dim=1).item()
         
-        # Compute PDP for each patch
+        # ImageNet normalization constants
+        IMAGENET_MEAN = [0.485, 0.456, 0.406]
+        IMAGENET_STD = [0.229, 0.224, 0.225]
+        
+        # Create grid of intensity values to test
+        intensity_values = np.linspace(0.0, 1.0, n_grid_points)
+        
+        # Compute PDP for each patch using batch inference
         pdp_plots = []
         
         for patch_idx in range(grid_size * grid_size):
@@ -92,47 +103,38 @@ def compute_image_pdp_explanation(
                 x_start = col * patch_w
                 x_end = (col + 1) * patch_w if col < grid_size - 1 else w
                 
-                # Create grid of intensity values to test
-                intensity_values = np.linspace(0.0, 1.0, n_grid_points)
-                predictions = []
+                # Pre-create all modified tensors for this patch
+                modified_tensors = []
                 
                 for intensity in intensity_values:
                     # Create modified image with patch intensity changed
                     modified_tensor = image_tensor_no_batch.clone()
                     
                     # Apply intensity to the patch region
-                    # We'll modify all channels uniformly
                     for channel in range(c):
-                        # Get the patch region
                         patch_region = modified_tensor[channel, y_start:y_end, x_start:x_end]
                         
                         # Denormalize, apply intensity, then renormalize
-                        # ImageNet normalization: (x - mean) / std
-                        # To denormalize: x * std + mean
-                        # To normalize: (x - mean) / std
-                        IMAGENET_MEAN = 0.485 if channel == 0 else (0.456 if channel == 1 else 0.406)
-                        IMAGENET_STD = 0.229 if channel == 0 else (0.224 if channel == 1 else 0.225)
-                        
-                        # Denormalize patch
-                        denormalized_patch = patch_region * IMAGENET_STD + IMAGENET_MEAN
-                        
-                        # Apply intensity (scale by intensity value)
+                        denormalized_patch = patch_region * IMAGENET_STD[channel] + IMAGENET_MEAN[channel]
                         modified_patch = denormalized_patch * intensity
+                        normalized_patch = (modified_patch - IMAGENET_MEAN[channel]) / IMAGENET_STD[channel]
                         
-                        # Renormalize
-                        normalized_patch = (modified_patch - IMAGENET_MEAN) / IMAGENET_STD
-                        
-                        # Update the patch
                         modified_tensor[channel, y_start:y_end, x_start:x_end] = normalized_patch
                     
-                    # Get prediction for modified image
-                    with torch.no_grad():
-                        modified_batch = modified_tensor.unsqueeze(0).to(device)
-                        outputs = model(modified_batch)
+                    modified_tensors.append(modified_tensor)
+                
+                # Batch inference for all intensity levels
+                predictions = []
+                batch_size = min(PDP_BATCH_SIZE, len(modified_tensors))
+                
+                with torch.no_grad():
+                    for batch_start in range(0, len(modified_tensors), batch_size):
+                        batch_end = min(batch_start + batch_size, len(modified_tensors))
+                        batch = torch.stack(modified_tensors[batch_start:batch_end]).to(device)
+                        outputs = model(batch)
                         probs = torch.nn.functional.softmax(outputs, dim=1)
-                        # Get probability for the predicted class
-                        pred_prob = probs[0, original_predicted_class].item()
-                        predictions.append(float(pred_prob))
+                        batch_preds = probs[:, original_predicted_class].cpu().numpy()
+                        predictions.extend([float(p) for p in batch_preds])
                 
                 pdp_plots.append({
                     "patch_index": int(patch_idx),
@@ -175,4 +177,3 @@ def compute_image_pdp_explanation(
     except Exception as exc:
         logger.error("Error computing PDP explanation for %s: %s (type: %s)", model_key, exc, type(exc).__name__, exc_info=True)
         return {"error": str(exc), "error_type": type(exc).__name__, "details": str(exc)}
-
