@@ -45,11 +45,11 @@ __all__ = [
 # Environment-aware configuration
 # PERFORMANCE OPTIMIZATIONS:
 # - XAI_PARALLEL=false (default) to avoid CPU contention
-# - XAI_ESSENTIAL_ONLY=true to compute only SHAP+LIME
+# - XAI_ESSENTIAL_ONLY=false to compute all 5 methods (sequentially)
 # - XAI_ENABLED=false to completely disable XAI
 XAI_TIMEOUT_SECONDS = int(os.getenv("XAI_TIMEOUT_SECONDS", "60"))
 XAI_PARALLEL = os.getenv("XAI_PARALLEL", "false").lower() == "true"  # Default to sequential
-XAI_ESSENTIAL_ONLY = os.getenv("XAI_ESSENTIAL_ONLY", "true").lower() == "true"  # Only SHAP + LIME
+XAI_ESSENTIAL_ONLY = os.getenv("XAI_ESSENTIAL_ONLY", "false").lower() == "true"  # Compute all 5 methods
 XAI_ENABLED = os.getenv("XAI_ENABLED", "true").lower() == "true"  # Master switch
 
 
