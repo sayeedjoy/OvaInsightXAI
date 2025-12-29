@@ -9,12 +9,13 @@ This application combines a FastAPI backend with a Next.js frontend to deliver a
 ## Features
 
 ### Core Prediction Features
-- **Multi-Disease Support**: Predictions for Ovarian Cancer, PCOS, and Hepatitis B
+- **Multi-Disease Support**: Predictions for Ovarian Cancer, PCOS, Hepatitis B, and Brain Tumor
+- **Brain Tumor Analysis**: Image-based analysis of MRI scans using deep learning (PyTorch/PVTv2)
 - **Ovarian Cancer Analysis**: Input 12 critical biomarkers including CA125, HE4, and other clinical indicators
 - **PCOS Analysis**: Input 20 clinical features including hormonal levels, BMI, and follicle measurements
 - **Hepatitis B Analysis**: Input 15 clinical and laboratory features including liver function tests
 - **Real-time Prediction**: Get instant predictions with confidence scores
-- **Test Case Generation**: Built-in test case generators for positive and negative scenarios for all models
+- **Test Case Generation**: Built-in test case generators for tabular models
 
 ### Explainable AI (XAI) Features
 - **SHAP (SHapley Additive exPlanations)**: Feature importance analysis showing how each feature contributes to the prediction
@@ -45,12 +46,12 @@ This application combines a FastAPI backend with a Next.js frontend to deliver a
 ### Backend
 - **FastAPI** - Modern, fast web framework for building APIs
 - **Python 3.10+** - Core programming language
-- **scikit-learn** - Machine learning models
-- **SHAP** - SHAP explanations
-- **LIME** - LIME explanations
+- **PyTorch / TIMM** - Deep learning for brain tumor image analysis
+- **scikit-learn** - Machine learning models for tabular data
+- **SHAP / LIME** - Explainable AI (XAI) for all models
 - **Pydantic** - Data validation
 - **Uvicorn** - ASGI server
-- **NumPy/Pandas** - Data processing
+- **NumPy/Pandas / PIL** - Data and image processing
 
 ### Frontend
 - **Next.js 15** - React framework with App Router
@@ -76,6 +77,7 @@ This application combines a FastAPI backend with a Next.js frontend to deliver a
 │   │   │   ├── model.pkl        # Trained Ovarian Cancer model
 │   │   │   ├── pcos.pkl         # Trained PCOS model
 │   │   │   ├── Hepatitis_B.pkl  # Trained Hepatitis B model
+│   │   │   ├── model_PTH.pth    # Trained Brain Tumor model (PyTorch)
 │   │   │   ├── predictor.py     # Model loading and inference
 │   │   │   └── registry.py      # Model registry and configuration
 │   │   ├── services/
@@ -317,14 +319,32 @@ Submit clinical and laboratory data for Hepatitis B prediction.
 }
 ```
 
+#### POST /predict/brain_tumor
+
+Submit an MRI image for brain tumor classification and XAI analysis.
+
+**Form Data:**
+- `file`: MRI image file (JPEG/PNG)
+- `include_xai`: (optional, default: true)
+
 **Response:**
 ```json
 {
-  "prediction": 1,
-  "confidence": 0.82,
-  "xai": {...}
+  "prediction": "Glioma",
+  "confidence": 0.94,
+  "xai": {
+    "shap": {"heatmap_image": "base64...", ...},
+    "lime": {"visualization_image": "base64...", ...},
+    "pdp_1d": {...},
+    "ice_1d": {...},
+    "ale_1d": {...}
+  }
 }
 ```
+
+- `prediction`: Tumor class (Glioma, Meningioma, No Tumor, Pituitary)
+- `confidence`: Confidence score
+- `xai`: Comprehensive image-based XAI visualizations
 
 **Query Parameters:**
 - `include_xai` (optional, default: `true`): Set to `false` to disable XAI explanations for faster responses
@@ -627,12 +647,15 @@ HOST=0.0.0.0
 # CORS Origins (comma-separated)
 ALLOWED_ORIGINS=https://your-frontend-domain.com,https://www.your-frontend-domain.com
 
-# Optional: XAI Configuration
-XAI_TIMEOUT_SECONDS=30
-XAI_PARALLEL=true
+# XAI Performance Optimization (Critical for Brain Tumor)
+XAI_ENABLED=true                # Master switch for XAI
+XAI_PARALLEL=false              # Set false to prevent CPU spikes (sequential)
+XAI_ESSENTIAL_ONLY=false        # Set true to compute only SHAP/LIME for speed
 
-# Optional: Model Download (if using cloud storage)
-MODEL_URL=https://your-storage-url.com/models/model.pkl
+# Brain Tumor Specific XAI Tuning
+SHAP_IMAGE_PATCH_SIZE=48        # Larger = faster computation
+SHAP_IMAGE_STRIDE=24            # Larger = fewer grid points
+LIME_IMAGE_NUM_SAMPLES=50       # Lower = faster computation
 ```
 
 ### CORS Configuration
@@ -703,6 +726,13 @@ For production, ensure your frontend domain is included in `ALLOWED_ORIGINS`.
 - **Model File**: `Hepatitis_B.pkl`
 - **Endpoint**: `/predict/hepatitis_b`
 - **XAI Support**: Full support for all XAI methods
+
+### Brain Tumor Model
+- **Type**: Deep Learning (Image-based)
+- **Architecture**: PVTv2-B1 with custom classifier
+- **Model File**: `model_PTH.pth`
+- **Endpoint**: `/predict/brain_tumor`
+- **XAI Support**: Full image-based support (Patch-based PDP/ICE/ALE/SHAP/LIME)
 
 ## Important Notes
 
