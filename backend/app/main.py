@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ML Prediction API",
     description="Serves predictions for the 12-feature medical model.",
-    version="0.1.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -170,7 +170,7 @@ async def root():
     return {
         "status": "ok",
         "message": "ML Prediction API is running",
-        "version": "0.1.0",
+        "version": "2.0.0",
         "endpoints": {
             "health": "/health",
             "predict": "/predict",
