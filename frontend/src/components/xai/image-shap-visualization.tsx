@@ -10,9 +10,9 @@ interface ImageSHAPVisualizationProps {
     originalImageUrl?: string | null  // Optional: original image URL for overlay
 }
 
-export function ImageSHAPVisualization({ 
-    explanation, 
-    originalImageUrl 
+export function ImageSHAPVisualization({
+    explanation,
+    originalImageUrl
 }: ImageSHAPVisualizationProps) {
     const [overlayOpacity, setOverlayOpacity] = useState(0.5)
     const [showOverlay, setShowOverlay] = useState(true)
@@ -122,46 +122,14 @@ export function ImageSHAPVisualization({
                 </CardHeader>
                 <CardContent>
                     <CardDescription className="text-xs leading-relaxed">
-                        The heatmap shows which regions of the MRI image contributed most to the prediction. 
-                        Red/yellow areas indicate high importance (strong influence on the prediction), 
-                        while blue areas indicate low importance. This helps identify which parts of the 
+                        The heatmap shows which regions of the MRI image contributed most to the prediction.
+                        Red/yellow areas indicate high importance (strong influence on the prediction),
+                        while blue areas indicate low importance. This helps identify which parts of the
                         brain scan the model focuses on when making its classification.
                     </CardDescription>
                 </CardContent>
             </Card>
 
-            {/* Prediction Probabilities */}
-            {explanation.probabilities && explanation.probabilities.length > 0 && (
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-semibold">Class Probabilities</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            {explanation.probabilities.map((prob, idx) => {
-                                const classes = ["Glioma", "Meningioma", "Tumor"]
-                                const className = classes[idx] || `Class ${idx}`
-                                return (
-                                    <div key={idx} className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">{className}</span>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-primary transition-all"
-                                                    style={{ width: `${prob * 100}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-sm font-medium w-12 text-right">
-                                                {(prob * 100).toFixed(1)}%
-                                            </span>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
         </div>
     )
 }

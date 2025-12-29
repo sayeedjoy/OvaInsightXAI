@@ -11,9 +11,9 @@ interface ImageLIMEVisualizationProps {
     originalImageUrl?: string | null  // Optional: original image URL
 }
 
-export function ImageLIMEVisualization({ 
-    explanation, 
-    originalImageUrl 
+export function ImageLIMEVisualization({
+    explanation,
+    originalImageUrl
 }: ImageLIMEVisualizationProps) {
     const [selectedFeature, setSelectedFeature] = useState<number | null>(null)
 
@@ -44,8 +44,8 @@ export function ImageLIMEVisualization({
     // Sort features by absolute importance
     const sortedFeatures = explanation.feature_importance
         ? [...explanation.feature_importance].sort(
-              (a, b) => Math.abs(b.importance) - Math.abs(a.importance)
-          )
+            (a, b) => Math.abs(b.importance) - Math.abs(a.importance)
+        )
         : []
 
     return (
@@ -77,14 +77,13 @@ export function ImageLIMEVisualization({
                                 return (
                                     <div
                                         key={feature.feature_index}
-                                        className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
-                                            selectedFeature === feature.feature_index
+                                        className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${selectedFeature === feature.feature_index
                                                 ? "bg-primary/10 border-primary"
                                                 : "hover:bg-muted"
-                                        }`}
+                                            }`}
                                         onClick={() => setSelectedFeature(
-                                            selectedFeature === feature.feature_index 
-                                                ? null 
+                                            selectedFeature === feature.feature_index
+                                                ? null
                                                 : feature.feature_index
                                         )}
                                     >
@@ -100,11 +99,10 @@ export function ImageLIMEVisualization({
                                             </Badge>
                                         </div>
                                         <span
-                                            className={`text-sm font-semibold ${
-                                                isPositive
+                                            className={`text-sm font-semibold ${isPositive
                                                     ? "text-green-600 dark:text-green-400"
                                                     : "text-red-600 dark:text-red-400"
-                                            }`}
+                                                }`}
                                         >
                                             {feature.importance > 0 ? "+" : ""}
                                             {feature.importance.toFixed(4)}
@@ -127,47 +125,15 @@ export function ImageLIMEVisualization({
                 </CardHeader>
                 <CardContent>
                     <CardDescription className="text-xs leading-relaxed">
-                        LIME (Local Interpretable Model-agnostic Explanations) divides the image into 
-                        superpixels (similar regions) and shows how each region affects the prediction. 
-                        Positive values (green) indicate regions that increase the prediction confidence, 
-                        while negative values (red) indicate regions that decrease it. This helps identify 
+                        LIME (Local Interpretable Model-agnostic Explanations) divides the image into
+                        superpixels (similar regions) and shows how each region affects the prediction.
+                        Positive values (green) indicate regions that increase the prediction confidence,
+                        while negative values (red) indicate regions that decrease it. This helps identify
                         which specific areas of the brain scan are most relevant to the model's decision.
                     </CardDescription>
                 </CardContent>
             </Card>
 
-            {/* Prediction Probabilities */}
-            {explanation.probabilities && explanation.probabilities.length > 0 && (
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-semibold">Class Probabilities</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            {explanation.probabilities.map((prob, idx) => {
-                                const classes = ["Glioma", "Meningioma", "Tumor"]
-                                const className = classes[idx] || `Class ${idx}`
-                                return (
-                                    <div key={idx} className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">{className}</span>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-primary transition-all"
-                                                    style={{ width: `${prob * 100}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-sm font-medium w-12 text-right">
-                                                {(prob * 100).toFixed(1)}%
-                                            </span>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
         </div>
     )
 }
