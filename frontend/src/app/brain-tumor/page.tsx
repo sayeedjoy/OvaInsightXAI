@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { BarChart3 } from "lucide-react"
 import { BrainTumorPredictionForm } from "@/components/brain-tumor-components"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -8,6 +9,7 @@ import {
     type PredictionResult,
     PredictionLoading
 } from "@/components/prediction-components"
+import { XAIContainer } from "@/components/xai"
 
 export default function BrainTumorPredictPage() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -171,6 +173,28 @@ export default function BrainTumorPredictPage() {
                         displayClass={true}
                     />
                 </div>
+
+                {/* Model Explanations Section */}
+                {result?.xai && (
+                    <div className="mt-6 lg:mt-10">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center gap-2">
+                                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                                    <CardTitle className="text-lg font-semibold sm:text-xl">
+                                        Model Explanations
+                                    </CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <XAIContainer 
+                                    xaiData={result.xai} 
+                                    originalImageUrl={previewUrl}
+                                />
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
             </div>
         </>
     )

@@ -132,3 +132,27 @@ def generate_training_data(
         _TRAINING_DATA_CACHE[cache_key] = (X, y)
         return X, y
 
+
+def is_image_model(model_key: str) -> bool:
+    """Check if a model is image-based (PyTorch) or tabular (sklearn).
+    
+    Args:
+        model_key: The model key to check
+    
+    Returns:
+        True if the model is image-based, False if tabular
+    """
+    return model_key == "brain_tumor"
+
+
+def get_image_model(model_key: str) -> Any:
+    """Get the loaded image model.
+    
+    Args:
+        model_key: The model key (e.g., "brain_tumor")
+    
+    Returns:
+        The loaded PyTorch model
+    """
+    predictor.ensure_model_loaded(model_key)
+    return predictor.get_model(model_key)

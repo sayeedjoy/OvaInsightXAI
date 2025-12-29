@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         const backendFormData = new FormData()
         backendFormData.append("file", file)
 
-        const response = await fetch(`${BACKEND_URL}/predict/brain_tumor?include_xai=false`, {
+        const response = await fetch(`${BACKEND_URL}/predict/brain_tumor?include_xai=true`, {
             method: "POST",
             body: backendFormData
         })

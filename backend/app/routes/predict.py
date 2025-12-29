@@ -20,7 +20,7 @@ from app.schemas.input_schema import (
 )
 from app.services import image_preprocessing
 from app.services.preprocessing import request_to_features
-from app.services.xai import compute_all_xai_explanations
+from app.services.xai import compute_all_xai_explanations, compute_all_image_xai_explanations
 from app.utils.config import FeatureOrderError
 
 logger = logging.getLogger(__name__)
@@ -196,7 +196,7 @@ async def predict_pcos(
 @router.post("/predict/brain_tumor", response_model=PredictionResponse)
 async def predict_brain_tumor(
     file: UploadFile = File(...),
-    include_xai: bool = False
+    include_xai: bool = True
 ) -> PredictionResponse:
     """Prediction endpoint for brain tumor model (image-based)."""
     model_key = "brain_tumor"
@@ -273,11 +273,29 @@ async def predict_brain_tumor(
         logger.warning("Invalid prediction index %d, using index as-is", prediction_idx)
         prediction_class = prediction_idx
     
-    # Return response (XAI not supported for image models currently)
+    # Compute XAI explanations if requested
+    xai_explanations = None
+    if include_xai:
+        try:
+            logger.info("Computing XAI explanations for %s", model_key)
+            xai_explanations = compute_all_image_xai_explanations(model_key, image_tensor)
+            # Convert to dict for JSON serialization
+            xai_explanations = {
+                "shap": xai_explanations["shap"],
+                "lime": xai_explanations["lime"],
+                "pdp_1d": xai_explanations["pdp_1d"],
+                "ice_1d": xai_explanations["ice_1d"],
+                "ale_1d": xai_explanations["ale_1d"],
+            }
+        except Exception as exc:
+            logger.warning("Failed to compute XAI explanations for %s: %s", model_key, exc, exc_info=True)
+            # Don't fail the prediction if XAI fails, just log it
+            xai_explanations = {"error": f"XAI computation failed: {str(exc)}"}
+    
     return PredictionResponse(
         prediction=prediction_class,  # Return class name as string
         confidence=result.confidence,
-        xai=None  # XAI not implemented for image models
+        xai=xai_explanations
     )
 
 

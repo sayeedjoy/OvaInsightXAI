@@ -7,16 +7,33 @@ import { LIMEVisualization } from "./lime-visualization"
 import { PDPVisualization } from "./pdp-visualization"
 import { ICEVisualization } from "./ice-visualization"
 import { ALEVisualization } from "./ale-visualization"
+import { ImageSHAPVisualization } from "./image-shap-visualization"
+import { ImageLIMEVisualization } from "./image-lime-visualization"
+import { ImagePDPVisualization } from "./image-pdp-visualization"
+import { ImageICEVisualization } from "./image-ice-visualization"
+import { ImageALEVisualization } from "./image-ale-visualization"
 import { XAILoading } from "./xai-loading"
 import type { XAIResponse } from "@/types/xai"
-import { isSHAPExplanation, isLIMEExplanation, isPDP1DResponse, isICE1DResponse, isALE1DResponse } from "@/types/xai"
+import { 
+    isSHAPExplanation, 
+    isLIMEExplanation, 
+    isPDP1DResponse, 
+    isICE1DResponse, 
+    isALE1DResponse,
+    isImageSHAPExplanation,
+    isImageLIMEExplanation,
+    isImagePDPExplanation,
+    isImageICEExplanation,
+    isImageALEExplanation
+} from "@/types/xai"
 
 interface XAIContainerProps {
     xaiData: XAIResponse | null
     isLoading?: boolean
+    originalImageUrl?: string | null  // For image models: URL of the original uploaded image
 }
 
-export function XAIContainer({ xaiData, isLoading }: XAIContainerProps) {
+export function XAIContainer({ xaiData, isLoading, originalImageUrl }: XAIContainerProps) {
     const [activeTab, setActiveTab] = useState("shap")
 
     if (isLoading) {
@@ -31,12 +48,24 @@ export function XAIContainer({ xaiData, isLoading }: XAIContainerProps) {
         )
     }
 
-    // Validate and extract explanations
+    // Detect if this is image-based XAI
+    const isImageXAI = isImageSHAPExplanation(xaiData.shap) || 
+                       isImageLIMEExplanation(xaiData.lime) ||
+                       isImagePDPExplanation(xaiData.pdp_1d) ||
+                       isImageICEExplanation(xaiData.ice_1d) ||
+                       isImageALEExplanation(xaiData.ale_1d)
+
+    // Validate and extract explanations (support both tabular and image)
     const shapExplanation = isSHAPExplanation(xaiData.shap) ? xaiData.shap : null
+    const imageShapExplanation = isImageSHAPExplanation(xaiData.shap) ? xaiData.shap : null
     const limeExplanation = isLIMEExplanation(xaiData.lime) ? xaiData.lime : null
+    const imageLimeExplanation = isImageLIMEExplanation(xaiData.lime) ? xaiData.lime : null
     const pdpResponse = isPDP1DResponse(xaiData.pdp_1d) ? xaiData.pdp_1d : null
+    const imagePdpExplanation = isImagePDPExplanation(xaiData.pdp_1d) ? xaiData.pdp_1d : null
     const iceResponse = isICE1DResponse(xaiData.ice_1d) ? xaiData.ice_1d : null
+    const imageIceExplanation = isImageICEExplanation(xaiData.ice_1d) ? xaiData.ice_1d : null
     const aleResponse = isALE1DResponse(xaiData.ale_1d) ? xaiData.ale_1d : null
+    const imageAleExplanation = isImageALEExplanation(xaiData.ale_1d) ? xaiData.ale_1d : null
 
     return (
         <div className="space-y-4">
@@ -49,48 +78,113 @@ export function XAIContainer({ xaiData, isLoading }: XAIContainerProps) {
                     <TabsTrigger value="ale">ALE</TabsTrigger>
                 </TabsList>
                 <TabsContent value="shap" className="mt-4">
-                    {shapExplanation ? (
-                        <SHAPVisualization explanation={shapExplanation} />
+                    {isImageXAI ? (
+                        imageShapExplanation ? (
+                            <ImageSHAPVisualization 
+                                explanation={imageShapExplanation} 
+                                originalImageUrl={originalImageUrl}
+                            />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">SHAP explanation not available</p>
+                            </div>
+                        )
                     ) : (
-                        <div className="rounded-lg border border-muted p-4">
-                            <p className="text-sm text-muted-foreground">SHAP explanation not available</p>
-                        </div>
+                        shapExplanation ? (
+                            <SHAPVisualization explanation={shapExplanation} />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">SHAP explanation not available</p>
+                            </div>
+                        )
                     )}
                 </TabsContent>
                 <TabsContent value="lime" className="mt-4">
-                    {limeExplanation ? (
-                        <LIMEVisualization explanation={limeExplanation} />
+                    {isImageXAI ? (
+                        imageLimeExplanation ? (
+                            <ImageLIMEVisualization 
+                                explanation={imageLimeExplanation} 
+                                originalImageUrl={originalImageUrl}
+                            />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">LIME explanation not available</p>
+                            </div>
+                        )
                     ) : (
-                        <div className="rounded-lg border border-muted p-4">
-                            <p className="text-sm text-muted-foreground">LIME explanation not available</p>
-                        </div>
+                        limeExplanation ? (
+                            <LIMEVisualization explanation={limeExplanation} />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">LIME explanation not available</p>
+                            </div>
+                        )
                     )}
                 </TabsContent>
                 <TabsContent value="pdp" className="mt-4">
-                    {pdpResponse ? (
-                        <PDPVisualization explanation={pdpResponse} />
+                    {isImageXAI ? (
+                        imagePdpExplanation ? (
+                            <ImagePDPVisualization 
+                                explanation={imagePdpExplanation} 
+                                originalImageUrl={originalImageUrl}
+                            />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">PDP explanation not available</p>
+                            </div>
+                        )
                     ) : (
-                        <div className="rounded-lg border border-muted p-4">
-                            <p className="text-sm text-muted-foreground">PDP plots not available</p>
-                        </div>
+                        pdpResponse ? (
+                            <PDPVisualization explanation={pdpResponse} />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">PDP plots not available</p>
+                            </div>
+                        )
                     )}
                 </TabsContent>
                 <TabsContent value="ice" className="mt-4">
-                    {iceResponse ? (
-                        <ICEVisualization explanation={iceResponse} />
+                    {isImageXAI ? (
+                        imageIceExplanation ? (
+                            <ImageICEVisualization 
+                                explanation={imageIceExplanation} 
+                                originalImageUrl={originalImageUrl}
+                            />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">ICE explanation not available</p>
+                            </div>
+                        )
                     ) : (
-                        <div className="rounded-lg border border-muted p-4">
-                            <p className="text-sm text-muted-foreground">ICE plots not available</p>
-                        </div>
+                        iceResponse ? (
+                            <ICEVisualization explanation={iceResponse} />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">ICE plots not available</p>
+                            </div>
+                        )
                     )}
                 </TabsContent>
                 <TabsContent value="ale" className="mt-4">
-                    {aleResponse ? (
-                        <ALEVisualization explanation={aleResponse} />
+                    {isImageXAI ? (
+                        imageAleExplanation ? (
+                            <ImageALEVisualization 
+                                explanation={imageAleExplanation} 
+                                originalImageUrl={originalImageUrl}
+                            />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">ALE explanation not available</p>
+                            </div>
+                        )
                     ) : (
-                        <div className="rounded-lg border border-muted p-4">
-                            <p className="text-sm text-muted-foreground">ALE plots not available</p>
-                        </div>
+                        aleResponse ? (
+                            <ALEVisualization explanation={aleResponse} />
+                        ) : (
+                            <div className="rounded-lg border border-muted p-4">
+                                <p className="text-sm text-muted-foreground">ALE plots not available</p>
+                            </div>
+                        )
                     )}
                 </TabsContent>
             </Tabs>
