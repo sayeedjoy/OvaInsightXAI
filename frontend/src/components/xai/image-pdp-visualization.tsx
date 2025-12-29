@@ -85,8 +85,8 @@ export function ImagePDPVisualization({
                                 key={plot.patch_index}
                                 onClick={() => setSelectedPatch(idx)}
                                 className={`rounded-md border px-3 py-1 text-xs transition-colors ${selectedPatch === idx || (selectedPatch === null && idx === 0)
-                                        ? "border-primary bg-primary/10 text-primary"
-                                        : "border-muted bg-background hover:bg-muted"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-muted bg-background hover:bg-muted"
                                     }`}
                             >
                                 Patch {plot.patch_index} ({plot.patch_row}, {plot.patch_col})
@@ -129,20 +129,22 @@ export function ImagePDPVisualization({
                                         />
                                         <Tooltip
                                             contentStyle={{
-                                                backgroundColor: 'hsl(var(--card))',
-                                                border: '1px solid hsl(var(--border))',
-                                                borderRadius: '8px'
+                                                backgroundColor: 'var(--color-card, hsl(var(--card)))',
+                                                border: '1px solid var(--color-border, hsl(var(--border)))',
+                                                borderRadius: '8px',
+                                                color: 'var(--color-foreground, hsl(var(--foreground)))'
                                             }}
+                                            labelStyle={{ color: 'var(--color-foreground, hsl(var(--foreground)))' }}
                                             formatter={(value: number) => [value.toFixed(4), 'Probability']}
                                         />
-                                        <ReferenceLine y={0.5} stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" />
+                                        <ReferenceLine y={0.5} stroke="#9ca3af" strokeDasharray="5 5" />
                                         <Line
                                             type="monotone"
                                             dataKey="prediction"
-                                            stroke="hsl(var(--primary))"
+                                            stroke="#6366f1"
                                             strokeWidth={2}
-                                            dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 3 }}
-                                            activeDot={{ r: 5, fill: 'hsl(var(--primary))' }}
+                                            dot={{ fill: '#6366f1', strokeWidth: 2, r: 3 }}
+                                            activeDot={{ r: 5, fill: '#6366f1' }}
                                         />
                                     </LineChart>
                                 </ResponsiveContainer>
