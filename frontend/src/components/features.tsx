@@ -27,6 +27,14 @@ const features = [
       "Comprehensive AI-powered model for Polycystic Ovary Syndrome prediction. Evaluate multiple health parameters to assist in accurate diagnosis and management.",
     tutorialLink: "/pcos",
     image: "/model-pcos.webp",
+  },
+  {
+    category: "Medical Conditions",
+    title: "Brain Tumor Prediction",
+    details:
+      "Comprehensive AI-powered model for Brain Tumor prediction. Evaluate multiple health parameters to assist in accurate diagnosis and management.",
+    tutorialLink: "/brain-tumor",
+    image: "/model-brain.webp",
   }
 ];
 
