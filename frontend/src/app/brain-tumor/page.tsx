@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useRef } from "react"
 import { BarChart3 } from "lucide-react"
-import { BrainTumorPredictionForm } from "@/components/brain-tumor-components"
+import { 
+    BrainTumorPredictionForm,
+    BrainPredictionResultCard,
+    type PredictionResult
+} from "@/components/brain-tumor-components"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-    PredictionResultCard,
-    type PredictionResult,
-    PredictionLoading
-} from "@/components/prediction-components"
+import { PredictionLoading } from "@/components/prediction-components"
 import { XAIContainer } from "@/components/xai"
 
 export default function BrainTumorPredictPage() {
@@ -166,11 +166,9 @@ export default function BrainTumorPredictPage() {
                             onReset={resetForm}
                         />
                     </div>
-                    <PredictionResultCard
+                    <BrainPredictionResultCard
                         result={result}
                         error={error}
-                        conditionName="Brain Tumor"
-                        displayClass={true}
                     />
                 </div>
 
