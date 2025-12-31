@@ -4,6 +4,7 @@ import {
     AlertCircle,
     AlertTriangle,
     BarChart3,
+    CheckCircle2,
     Gauge,
     Info
 } from "lucide-react"
@@ -34,12 +35,32 @@ export function BrainPredictionResultCard({
     error
 }: BrainPredictionResultCardProps) {
     const getPredictionDisplay = (prediction: number | string) => {
-        // Handle string class names (e.g., "glioma", "meningioma", "tumor")
+        // Handle string class names (e.g., "glioma", "meningioma", "pituitary", "notumor")
         if (typeof prediction === "string") {
-            const classLabel = prediction.charAt(0).toUpperCase() + prediction.slice(1)
+            // Special handling for "notumor" - show as positive result (no tumor detected)
+            if (prediction === "notumor") {
+                return {
+                    label: "No Tumor Detected",
+                    description: "The AI model indicates no visible brain tumor in the MRI image. The scan appears normal.",
+                    variant: "default" as const,
+                    icon: CheckCircle2,
+                    iconColor: "text-green-600 dark:text-green-500",
+                    bgColor: "bg-green-50 dark:bg-green-950/20",
+                    borderColor: "border-green-200 dark:border-green-800"
+                }
+            }
+            
+            // Format class names for display
+            let classLabel: string
+            if (prediction === "pituitary") {
+                classLabel = "Pituitary tumor"
+            } else {
+                classLabel = prediction.charAt(0).toUpperCase() + prediction.slice(1)
+            }
+            
             return {
                 label: `Classified as: ${classLabel} (Tumor Detected)`,
-                description: `The AI model detected brain MRI patterns consistent with a ${prediction}.`,
+                description: `The AI model detected brain MRI patterns consistent with ${prediction === "pituitary" ? "a pituitary tumor" : `a ${prediction}`}.`,
                 variant: "default" as const,
                 icon: Info,
                 iconColor: "text-blue-600 dark:text-blue-500",

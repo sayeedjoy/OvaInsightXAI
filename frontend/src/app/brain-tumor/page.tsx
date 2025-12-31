@@ -151,7 +151,7 @@ export default function BrainTumorPredictPage() {
                         Brain Tumor Classification
                     </h1>
                     <p className="text-sm text-muted-foreground sm:text-base lg:text-lg max-w-2xl mx-auto">
-                        Upload a brain MRI image to classify it as glioma, meningioma, or tumor.
+                        Upload a brain MRI image to classify it as glioma, meningioma, pituitary tumor, or no tumor.
                     </p>
                 </div>
                 <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-10 xl:gap-12">

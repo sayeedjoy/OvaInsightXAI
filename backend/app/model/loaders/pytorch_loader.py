@@ -32,7 +32,7 @@ def load_pytorch_model(path: Path) -> Any:
                 return model
             elif isinstance(model, dict):
                 state_dict = None
-                num_classes = 3  # Brain tumor has 3 classes
+                num_classes = 4  # Brain tumor has 4 classes
                 
                 # Extract state_dict
                 if "state_dict" in model:

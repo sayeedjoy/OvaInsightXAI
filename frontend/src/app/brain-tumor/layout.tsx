@@ -7,12 +7,13 @@ import "@/components/brain-tumor-components/index.css"
 export const metadata: Metadata = {
     title: "Brain Tumor Classification",
     description:
-        "Classify brain MRI images to detect glioma, meningioma, or tumor using advanced deep learning models. Upload an MRI image to get instant predictions with confidence scores.",
+        "Classify brain MRI images to detect glioma, meningioma, pituitary tumor, or no tumor using advanced deep learning models. Upload an MRI image to get instant predictions with confidence scores.",
     keywords: [
         "brain tumor",
         "brain tumor classification",
         "glioma",
         "meningioma",
+        "pituitary tumor",
         "MRI classification",
         "medical AI",
         "deep learning",
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
         url: `${site.url}/brain-tumor`,
         title: `Brain Tumor Classification | ${site.name}`,
         description:
-            "Classify brain MRI images to detect glioma, meningioma, or tumor using advanced deep learning models. Upload an MRI image to get instant predictions with confidence scores.",
+            "Classify brain MRI images to detect glioma, meningioma, pituitary tumor, or no tumor using advanced deep learning models. Upload an MRI image to get instant predictions with confidence scores.",
         images: [
             {
                 url: site.ogImage,
@@ -37,7 +38,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: `Brain Tumor Classification | ${site.name}`,
         description:
-            "Classify brain MRI images to detect glioma, meningioma, or tumor using advanced deep learning models. Upload an MRI image to get instant predictions with confidence scores.",
+            "Classify brain MRI images to detect glioma, meningioma, pituitary tumor, or no tumor using advanced deep learning models. Upload an MRI image to get instant predictions with confidence scores.",
         images: [site.ogImage]
     }
 }
