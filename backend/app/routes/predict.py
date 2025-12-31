@@ -273,6 +273,19 @@ async def predict_brain_tumor(
         logger.warning("Invalid prediction index %d, using index as-is", prediction_idx)
         prediction_class = prediction_idx
     
+    # Get per-class probabilities from the predictor
+    all_probabilities = None
+    try:
+        from app.model.predictors.image_predictor import get_last_probabilities
+        probs = get_last_probabilities(model_key)
+        if probs and len(probs) == len(BRAIN_TUMOR_CLASSES):
+            all_probabilities = {
+                BRAIN_TUMOR_CLASSES[i]: round(prob, 4)
+                for i, prob in enumerate(probs)
+            }
+    except Exception as exc:
+        logger.debug("Could not retrieve per-class probabilities: %s", exc)
+    
     # Compute XAI explanations if requested
     xai_explanations = None
     if include_xai:
@@ -295,6 +308,7 @@ async def predict_brain_tumor(
     return PredictionResponse(
         prediction=prediction_class,  # Return class name as string
         confidence=result.confidence,
+        all_probabilities=all_probabilities,
         xai=xai_explanations
     )
 

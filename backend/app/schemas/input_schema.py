@@ -29,6 +29,7 @@ class PredictionResponse(BaseModel):
 
     prediction: Union[int, float, str]  # str for brain tumor class names
     confidence: float | None = None
+    all_probabilities: dict[str, float] | None = None  # Per-class probabilities for brain tumor
     xai: dict[str, Any] | None = None
 
 
