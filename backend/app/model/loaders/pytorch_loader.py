@@ -26,6 +26,38 @@ def load_pytorch_model(path: Path) -> Any:
         try:
             # Try loading as full model object first
             model = torch.load(path, map_location=device)
+            
+            # Extract normalization statistics from checkpoint if available
+            if isinstance(model, dict):
+                train_mean = model.get("train_mean_rgb")
+                train_std = model.get("train_std_rgb")
+                if train_mean is not None and train_std is not None:
+                    try:
+                        # Convert to list if tensor
+                        if hasattr(train_mean, "tolist"):
+                            mean_list = train_mean.tolist()
+                        elif isinstance(train_mean, (list, tuple)):
+                            mean_list = list(train_mean)
+                        else:
+                            mean_list = None
+                        
+                        if hasattr(train_std, "tolist"):
+                            std_list = train_std.tolist()
+                        elif isinstance(train_std, (list, tuple)):
+                            std_list = list(train_std)
+                        else:
+                            std_list = None
+                        
+                        if mean_list and std_list and len(mean_list) == 3 and len(std_list) == 3:
+                            from app.services import image_preprocessing
+                            image_preprocessing.set_dataset_normalization(mean_list, std_list)
+                            logger.info(
+                                "Loaded normalization stats from checkpoint: mean=%s, std=%s",
+                                mean_list, std_list
+                            )
+                    except Exception as exc:
+                        logger.warning("Failed to extract normalization stats from checkpoint: %s", exc)
+            
             if hasattr(model, "eval"):
                 model.eval()
                 logger.info("Loaded PyTorch model as full object")

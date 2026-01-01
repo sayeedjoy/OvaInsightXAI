@@ -187,5 +187,5 @@ class XAIResponse(BaseModel):
 
 
 # Brain Tumor Classification Classes
-BRAIN_TUMOR_CLASSES = ["glioma", "meningioma", "pituitary", "notumor"]
-"""Class mapping for brain tumor model: 0=glioma, 1=meningioma, 2=pituitary, 3=notumor"""
+BRAIN_TUMOR_CLASSES = ["glioma", "meningioma", "notumor", "pituitary"]
+"""Class mapping for brain tumor model: 0=glioma, 1=meningioma, 2=notumor, 3=pituitary"""
