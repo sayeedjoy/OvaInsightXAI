@@ -1,4 +1,4 @@
-# OvaInsightXAI - Multi-Disease Clinical AI Prediction System
+# MultiDx Clinical AI - Multi-Disease Clinical AI Prediction System
 
 A comprehensive full-stack web application for predicting multiple medical conditions using machine learning. This system provides early risk assessment for **Ovarian Cancer**, **PCOS (Polycystic Ovary Syndrome)**, and **Hepatitis B**, helping healthcare professionals make informed decisions with explainable AI insights.
 
@@ -68,57 +68,225 @@ This application combines a FastAPI backend with a Next.js frontend to deliver a
 .
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI application entry point
+│   │   ├── main.py                    # FastAPI application entry point
 │   │   ├── routes/
-│   │   │   └── predict.py       # Prediction endpoints for all models
+│   │   │   └── predict.py             # Prediction endpoints for all models
 │   │   ├── schemas/
-│   │   │   └── input_schema.py  # Pydantic models for validation (all models)
+│   │   │   └── input_schema.py        # Pydantic models for validation (all models)
 │   │   ├── model/
-│   │   │   ├── model.pkl        # Trained Ovarian Cancer model
-│   │   │   ├── pcos.pkl         # Trained PCOS model
-│   │   │   ├── Hepatitis_B.pkl  # Trained Hepatitis B model
-│   │   │   ├── model_PTH.pth    # Trained Brain Tumor model (PyTorch)
-│   │   │   ├── predictor.py     # Model loading and inference
-│   │   │   └── registry.py      # Model registry and configuration
+│   │   │   ├── base.py                # Base model interface
+│   │   │   ├── model.pkl              # Trained Ovarian Cancer model
+│   │   │   ├── pcos.pkl               # Trained PCOS model
+│   │   │   ├── Hepatitis_B.pkl        # Trained Hepatitis B model
+│   │   │   ├── model_PTH.pth          # Trained Brain Tumor model (PyTorch)
+│   │   │   ├── predictor.py           # Model loading and inference
+│   │   │   ├── registry.py            # Model registry and configuration
+│   │   │   ├── loaders/               # Model loaders
+│   │   │   │   ├── pytorch_loader.py  # PyTorch model loader
+│   │   │   │   └── sklearn_loader.py  # scikit-learn model loader
+│   │   │   └── predictors/            # Model predictors
+│   │   │       ├── image_predictor.py # Image-based prediction (Brain Tumor)
+│   │   │       └── sklearn_predictor.py # Tabular data prediction
 │   │   ├── services/
-│   │   │   ├── preprocessing.py # Data preprocessing utilities
-│   │   │   └── xai/             # Explainable AI services
-│   │   │       ├── shap_explainer.py
-│   │   │       ├── lime_explainer.py
-│   │   │       ├── pdp_explainer.py
-│   │   │       ├── ice_explainer.py
-│   │   │       ├── ale_explainer.py
-│   │   │       └── utils.py
+│   │   │   ├── preprocessing.py      # Data preprocessing utilities
+│   │   │   ├── image_preprocessing.py # Image preprocessing for Brain Tumor
+│   │   │   ├── tta_predictor.py      # Test-Time Augmentation predictor
+│   │   │   └── xai/                  # Explainable AI services
+│   │   │       ├── shap_explainer.py # SHAP for tabular data
+│   │   │       ├── lime_explainer.py # LIME for tabular data
+│   │   │       ├── pdp_explainer.py  # PDP for tabular data
+│   │   │       ├── ice_explainer.py  # ICE for tabular data
+│   │   │       ├── ale_explainer.py  # ALE for tabular data
+│   │   │       ├── image_shap_explainer.py  # SHAP for images
+│   │   │       ├── image_lime_explainer.py  # LIME for images
+│   │   │       ├── image_pdp_explainer.py  # PDP for images
+│   │   │       ├── image_ice_explainer.py  # ICE for images
+│   │   │       ├── image_ale_explainer.py # ALE for images
+│   │   │       └── utils.py          # XAI utility functions
 │   │   └── utils/
-│   │       └── config.py        # Configuration constants
-│   ├── Dockerfile               # Docker configuration
-│   ├── requirements.txt         # Python dependencies
-│   └── retrain_model.py         # Model retraining script
+│   │       └── config.py              # Configuration constants
+│   ├── scripts/                       # Utility scripts
+│   │   ├── download_model.py         # Model download script
+│   │   ├── download_model.sh         # Model download shell script
+│   │   ├── inspect_model.py          # Model inspection script
+│   │   └── README.md                  # Scripts documentation
+│   ├── docker-compose.yml             # Docker Compose configuration
+│   ├── Dockerfile                     # Docker configuration
+│   ├── requirements.txt               # Python dependencies
+│   └── retrain_model.py               # Model retraining script
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── ovarian/         # Ovarian Cancer prediction page
-│   │   │   ├── pcos/            # PCOS prediction page
-│   │   │   ├── hepatitis/       # Hepatitis B prediction page
-│   │   │   └── api/             # API routes
+│   │   │   ├── (home)/                # Home route group
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── api/                   # API routes
+│   │   │   │   ├── predict/           # Prediction API routes
+│   │   │   │   │   ├── route.ts       # Main prediction route
+│   │   │   │   │   ├── brain-tumor/   # Brain tumor prediction route
+│   │   │   │   │   ├── hepatitis_b/   # Hepatitis B prediction route
+│   │   │   │   │   └── pcos/          # PCOS prediction route
+│   │   │   │   └── uploadthing/       # UploadThing file upload routes
+│   │   │   │       ├── core.ts
+│   │   │   │       └── route.ts
+│   │   │   ├── brain-tumor/           # Brain Tumor prediction page
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── hepatitis/             # Hepatitis B prediction page
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── ovarian/               # Ovarian Cancer prediction page
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── pcos/                  # PCOS prediction page
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── features-section-01/   # Features section page
+│   │   │   ├── hero-section-01/       # Hero section page
+│   │   │   ├── layout.tsx             # Root layout
+│   │   │   ├── manifest.ts            # PWA manifest
+│   │   │   ├── providers.tsx           # React providers (theme, etc.)
+│   │   │   └── favicon.ico
 │   │   ├── components/
-│   │   │   ├── prediction-components/  # Shared prediction UI components
-│   │   │   ├── pcos-components/        # PCOS-specific components
-│   │   │   ├── hepatitis-components/    # Hepatitis-specific components
-│   │   │   ├── xai/                    # XAI visualization components
-│   │   │   └── layout/                 # Layout components (navbar, etc.)
-│   │   ├── lib/
+│   │   │   ├── brain-tumor-components/ # Brain Tumor specific components
+│   │   │   │   ├── brain-prediction-result.tsx
+│   │   │   │   ├── prediction-form.tsx
+│   │   │   │   ├── index.css
+│   │   │   │   └── index.ts
+│   │   │   ├── hepatitis-components/  # Hepatitis B specific components
+│   │   │   │   ├── prediction-form.tsx
+│   │   │   │   ├── index.css
+│   │   │   │   └── index.ts
+│   │   │   ├── pcos-components/       # PCOS specific components
+│   │   │   │   ├── prediction-form.tsx
+│   │   │   │   ├── index.css
+│   │   │   │   └── index.ts
+│   │   │   ├── prediction-components/ # Shared prediction UI components
+│   │   │   │   ├── prediction-form.tsx
+│   │   │   │   ├── prediction-result.tsx
+│   │   │   │   ├── prediction-loading.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── xai/                   # XAI visualization components
+│   │   │   │   ├── shap-visualization.tsx
+│   │   │   │   ├── lime-visualization.tsx
+│   │   │   │   ├── pdp-visualization.tsx
+│   │   │   │   ├── ice-visualization.tsx
+│   │   │   │   ├── ale-visualization.tsx
+│   │   │   │   ├── image-shap-visualization.tsx
+│   │   │   │   ├── image-lime-visualization.tsx
+│   │   │   │   ├── image-pdp-visualization.tsx
+│   │   │   │   ├── image-ice-visualization.tsx
+│   │   │   │   ├── image-ale-visualization.tsx
+│   │   │   │   ├── xai-container.tsx
+│   │   │   │   ├── xai-loading.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── layout/                # Layout components
+│   │   │   │   ├── navbar.tsx         # Navigation bar
+│   │   │   │   ├── app-sidebar.tsx    # Application sidebar
+│   │   │   │   ├── dynamic-breadcrumb.tsx
+│   │   │   │   ├── mode-toggle.tsx    # Dark/light mode toggle
+│   │   │   │   ├── page-header.tsx
+│   │   │   │   └── sections/           # Section components
+│   │   │   │       ├── benefits.tsx
+│   │   │   │       ├── community.tsx
+│   │   │   │       ├── contact.tsx
+│   │   │   │       ├── faq.tsx
+│   │   │   │       ├── footer.tsx
+│   │   │   │       ├── model.tsx
+│   │   │   │       ├── pricing.tsx
+│   │   │   │       ├── services.tsx
+│   │   │   │       ├── team.tsx
+│   │   │   │       ├── testimonial.tsx
+│   │   │   │       └── trusted.tsx
+│   │   │   ├── ui/                    # shadcn/ui components (29 components)
+│   │   │   │   ├── accordion.tsx
+│   │   │   │   ├── avatar.tsx
+│   │   │   │   ├── badge.tsx
+│   │   │   │   ├── breadcrumb.tsx
+│   │   │   │   ├── button.tsx
+│   │   │   │   ├── calendar.tsx
+│   │   │   │   ├── card.tsx
+│   │   │   │   ├── carousel.tsx
+│   │   │   │   ├── collapsible.tsx
+│   │   │   │   ├── dropdown-menu.tsx
+│   │   │   │   ├── form.tsx
+│   │   │   │   ├── icon.tsx
+│   │   │   │   ├── infinite-slider.tsx
+│   │   │   │   ├── input.tsx
+│   │   │   │   ├── label.tsx
+│   │   │   │   ├── marquee.tsx
+│   │   │   │   ├── navigation-menu.tsx
+│   │   │   │   ├── popover.tsx
+│   │   │   │   ├── progressive-blur.tsx
+│   │   │   │   ├── radio-group.tsx
+│   │   │   │   ├── scroll-area.tsx
+│   │   │   │   ├── select.tsx
+│   │   │   │   ├── separator.tsx
+│   │   │   │   ├── sheet.tsx
+│   │   │   │   ├── sidebar.tsx
+│   │   │   │   ├── skeleton.tsx
+│   │   │   │   ├── tabs.tsx
+│   │   │   │   ├── textarea.tsx
+│   │   │   │   └── tooltip.tsx
+│   │   │   ├── icons/                 # Custom icon components
+│   │   │   │   ├── discord-icon.tsx
+│   │   │   │   ├── github-icon.tsx
+│   │   │   │   ├── linkedin-icon.tsx
+│   │   │   │   └── x-icon.tsx
+│   │   │   ├── shadcn-studio/         # shadcn studio components
+│   │   │   │   ├── blocks/
+│   │   │   │   └── logo.tsx
+│   │   │   ├── features.tsx
+│   │   │   ├── hero.tsx
+│   │   │   ├── model-features.tsx
+│   │   │   └── team.tsx
+│   │   ├── lib/                       # Utility libraries
 │   │   │   ├── test-case-generator.ts      # Ovarian test case generator
 │   │   │   ├── pcos-test-case-generator.ts # PCOS test case generator
-│   │   │   └── hepatitis-test-case-generator.ts # Hepatitis test case generator
-│   │   └── styles/              # Global styles
-│   ├── package.json
-│   └── next.config.ts
+│   │   │   ├── hepatitis-test-case-generator.ts # Hepatitis test case generator
+│   │   │   ├── echarts-theme.ts            # ECharts theme configuration
+│   │   │   ├── uploadthing.ts              # UploadThing configuration
+│   │   │   └── utils.ts                    # General utilities
+│   │   ├── config/
+│   │   │   └── site.ts                # Site configuration
+│   │   ├── styles/                    # Global styles
+│   │   │   ├── globals.css
+│   │   │   └── custom.css
+│   │   └── types/
+│   │       └── xai.ts                 # XAI type definitions
+│   ├── public/                        # Static assets
+│   │   ├── hero.webp
+│   │   ├── logo.png
+│   │   ├── model-brain.webp
+│   │   ├── model-hepa.webp
+│   │   ├── model-ova.webp
+│   │   ├── model-pcos.webp
+│   │   ├── opengraph.webp
+│   │   └── team/                      # Team member images
+│   │       ├── aditto.webp
+│   │       ├── asif.webp
+│   │       ├── jilani.webp
+│   │       ├── joy.webp
+│   │       └── shibly.webp
+│   ├── biome.json                     # Biome linter configuration
+│   ├── components.json                # shadcn/ui components configuration
+│   ├── drizzle.config.ts              # Drizzle ORM configuration
+│   ├── Dockerfile                     # Frontend Docker configuration
+│   ├── LICENSE.md                     # License file
+│   ├── next.config.ts                 # Next.js configuration
+│   ├── next-env.d.ts                  # Next.js type definitions
+│   ├── package.json                   # Node.js dependencies
+│   ├── postcss.config.mjs             # PostCSS configuration
+│   ├── tsconfig.json                   # TypeScript configuration
+│   └── turbo.json                     # Turborepo configuration
 │
-├── DOKPLOY_SETUP.md            # Dokploy deployment guide
-├── HostGuide.md                # Comprehensive hosting guide
-└── README.md
+├── docs/
+│   ├── DOKPLOY_SETUP.md              # Dokploy deployment guide
+│   └── HostGuide.md                   # Comprehensive hosting guide
+│
+├── nixpacks.toml                      # Nixpacks configuration
+└── README.md                          # This file
 ```
 
 ## Prerequisites
